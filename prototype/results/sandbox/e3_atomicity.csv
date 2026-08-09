@@ -1,0 +1,5 @@
+case,accepts,rejects,mean_ns,p95_ns
+R_all_good,1000,0,445544,513351
+R_bad_aik,0,1000,74685,172195
+R_bad_L1,0,1000,79567,170187
+R_bad_L2,0,1000,76085,166638
