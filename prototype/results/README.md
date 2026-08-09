@@ -47,5 +47,4 @@ already stored here.
 
 The Intel PTT measurements were captured from a Live-USB Ubuntu
 session on the WSL2 host, because WSL2 does not expose the host TPM
-at `/dev/tpmrm0`. The full procedure is written up in
-`docs/06_user_measurement_plan.md`.
+at `/dev/tpmrm0`.
