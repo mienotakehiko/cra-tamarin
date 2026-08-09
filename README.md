@@ -6,9 +6,8 @@ Companion artefact for the paper
 > Takehiko Mieno, EPSON AVASYS Corporation.
 
 The repository contains the Tamarin theories, the reference Python
-prototype, every experiment script, the raw CSV data of the experiments,
-and the LaTeX sources of the paper. Every artefact can be re-executed
-end-to-end on an Ubuntu 24.04 LTS host.
+prototype, every experiment script, the raw CSV data of the experiments.
+Every artefact can be re-executed end-to-end on an Ubuntu 24.04 LTS host.
 
 ## What the paper is about
 
@@ -133,9 +132,6 @@ All CSV files under `prototype/results/` are the direct output of the
 | `wsl2`     | Ubuntu 24.04 on Windows 11 (WSL2)          | Intel i7-13700H  | Independent reproduction         |
 | `ftpm`     | Live-USB Ubuntu 24.04 with `/dev/tpmrm0`   | Intel i7-13700H  | Real firmware-TPM measurements   |
 
-The mapping between the paper's figure numbers and the CSV files is
-listed in `paper/figures/README.md`.
-
 ## Naming conventions
 
 - `E1` through `E7` in the code and this repository correspond exactly
@@ -152,16 +148,3 @@ listed in `paper/figures/README.md`.
 
 Takehiko Mieno, EPSON AVASYS Corporation, Ueda, Nagano 386-1214, Japan.
 Email: `Mieno.Takehiko2@exc.epson.co.jp`.
-
-## Citation
-
-If you build on this artefact, please cite the BCE'27 paper. A
-BibTeX entry is provided in `paper/references.bib` under the key
-`RW21_ArtefactRepo`.
-
-## Licence
-
-The repository is released under the MIT Licence; see `LICENSE`.
-The Springer `svproc.cls` and companion `.bst` files under
-`paper/` are Springer's LaTeX class files for the LNCS/LNNS series
-and are redistributed here under their original licence terms.
