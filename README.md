@@ -117,10 +117,6 @@ PROTO_TPM_MODE=swtpm PYTHONPATH=. python3 experiments/e1_baseline_attack.py
 PROTO_TPM_MODE=swtpm PYTHONPATH=. python3 experiments/e5_scalability.py
 ```
 
-For a hardware TPM (Intel PTT, Infineon SLB 9670, and similar), see
-`docs/06_user_measurement_plan.md` for boot-from-USB instructions and
-the `e7_ftpm_quote.py` recipe.
-
 ## Data provenance
 
 All CSV files under `prototype/results/` are the direct output of the
