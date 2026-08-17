@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================================
 #  setup.sh
-#  BCE'27 companion prototype -- environment bootstrap.
+#  Companion prototype -- environment bootstrap.
 #
 #  Idempotent, safe to run multiple times.  Exits 0 on full success.
 #  Verified on Ubuntu 24.04 LTS with:
