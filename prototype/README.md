@@ -64,7 +64,7 @@ PROTO_TPM_MODE=swtpm PYTHONPATH=. python3 experiments/e5_scalability.py
 | E4  | `e4_dh_latency.py`              | Section 7 auxiliary -- TEE-TPM DH latency    | (support) |
 | E5  | `e5_scalability.py`             | Section 7 Q4 -- k in {2, 10, 50, ..., 1000}  | Q4 |
 | E6  | `e6_concurrent_verifier.py`     | Section 8.2 -- concurrent-Verifier stress    | H2 (reviewer)     |
-| E7  | (recipe in docs/06)             | Section 7 Q4 -- Intel PTT fTPM Quote latency | Q5 (fTPM)         |
+| E7  |                                 | Section 7 Q4 -- Intel PTT fTPM Quote latency | Q5 (fTPM)         |
 
 ## Directory structure
 
