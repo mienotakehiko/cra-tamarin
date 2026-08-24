@@ -132,9 +132,10 @@ def hardened_quote_payload(
 #  TPM 2.0 qualifyingData construction  (paper Section 8, question Q2)
 # ------------------------------------------------------------------
 #  The extended payload is larger than TPM2B_DATA's 64-byte limit,
-#  so we hash it once more with SHA-256 (32 bytes) and pass THAT
-#  digest to TPM2_Quote.  The verifier receives the plaintext
-#  extended payload alongside the aggregate and re-hashes to match.
+#  so it is hashed once more with SHA-256 (32 bytes), and that digest
+#  is passed to TPM2_Quote as qualifyingData.  The verifier receives
+#  the plaintext extended payload alongside the aggregate and re-hashes
+#  to match.
 def qualifying_data_for(payload: bytes) -> bytes:
     return h(payload)
 

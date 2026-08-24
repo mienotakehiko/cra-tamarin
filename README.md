@@ -6,8 +6,9 @@ Companion artefact for the paper
 > Takehiko Mieno, EPSON AVASYS Corporation.
 
 The repository contains the Tamarin theories, the reference Python
-prototype, every experiment script, the raw CSV data of the experiments.
-Every artefact can be re-executed end-to-end on an Ubuntu 24.04 LTS host.
+prototype, every experiment script, and the raw CSV data of the
+experiments.  Every artefact can be re-executed end-to-end on an
+Ubuntu 24.04 LTS host.
 
 ## What the paper is about
 

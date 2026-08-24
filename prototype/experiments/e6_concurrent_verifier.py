@@ -20,9 +20,9 @@ Python-level watchdog thread samples the Verifier's event log at
   - No AcceptEntry ever appears without a matching earlier
     challenge / earlier signature verification.
 
-If either invariant fails we print the offending sample and exit
-non-zero.  Otherwise the test succeeds and we log the accept
-latency distribution to results/e6_concurrent.csv.
+If either invariant fails the script prints the offending sample and exits
+non-zero.  Otherwise the test succeeds and logs the accept-latency
+distribution to results/e6_concurrent.csv.
 
 The test is *not* a replacement for the multi-step Tamarin proof
 (that lives in fixed_split.spthy) but it demonstrates that the

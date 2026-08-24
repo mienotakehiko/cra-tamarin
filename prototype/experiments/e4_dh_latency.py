@@ -6,7 +6,7 @@ the aggregator's TEE and TPM stand-ins.  Corresponds to
     TEE_send + TPM_respond + TEE_finish
 in baseline.spthy / fixed.spthy (unchanged between the two).
 
-We use X25519 for the DH (fast, standard IoT choice), Ed25519 for the
+The experiment uses X25519 for the DH (fast, standard IoT choice), Ed25519 for the
 TEE and TPM transcript signatures, matching the crypto.py stand-ins.
 
 Run:

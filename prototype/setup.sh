@@ -17,7 +17,7 @@
 #        prototype/crypto.py + prototype/tpm_swtpm.py
 #      * PROTO_TPM_MODE=mock (default) skips the swtpm daemon entirely
 #
-#  This script does NOT rely on tpm2-pytss.  We use tpm2-tools via
+#  This script does NOT rely on tpm2-pytss.  It uses tpm2-tools via
 #  subprocess because its CLI is more stable across Ubuntu versions.
 #  tpm2-pytss remains a Python dependency ONLY as a convenience for
 #  users who want to write their own experiments; the shipped
@@ -76,7 +76,7 @@ else
 fi
 
 # ---- 4. Start swtpm ----------------------------------------------------
-# We start swtpm in a way that survives shell exit even on
+# swtpm is started in a way that survives shell exit even on
 # minimal-init containers (e.g. Docker or tini-based sandboxes).
 TPM_DIR="${TPM_DIR:-/tmp/mytpm0}"
 log "provisioning swtpm at $TPM_DIR"
@@ -143,7 +143,7 @@ if [[ -d "prototype/prototype" ]]; then
     log "python-level swtpm test (real TPM2_Quote round trip)"
     # NOTE: this script is expected to be run from the tarball's
     # top-level 'prototype' directory (which contains the inner
-    # importable 'prototype/' package plus README/setup.sh).  We do
+    # importable 'prototype/' package plus README/setup.sh).  The script does
     # NOT cd into a subdirectory here.
     (
         PROTO_TPM_MODE=swtpm SWTPM_SOCKET="$TPM_DIR/swtpm-sock" PYTHONPATH=. \

@@ -1,7 +1,7 @@
 """
 E5 -- scalability sweep over k.  Reply to reviewer issue H1.
 
-For each k in K_VALUES, we build a k-leaf ad-hoc scenario using the
+For each k in K_VALUES, the script builds a k-leaf ad-hoc scenario using the
 existing 2-leaf Aggregator/Verifier as building blocks, and measure:
 
   * Aggregator-side construction time
@@ -11,7 +11,7 @@ existing 2-leaf Aggregator/Verifier as building blocks, and measure:
   * On-wire aggregate report size.
 
 Because the existing prototype's HardenedAggregator/HardenedVerifier
-are hard-coded to |R|=2, we time the O(k) work in two additive parts:
+are hard-coded to |R|=2, the script times the O(k) work in two additive parts:
 
   T_aggregate(k)  = T_quote  +  k * T_dice_verify
   T_verifier(k)   = T_quote_verify  +  k * T_dice_verify

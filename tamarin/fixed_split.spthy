@@ -200,7 +200,7 @@ rule Aggregator_Quote_Fixed:
  *  MULTI-STEP VERIFIER  (reply to H2)
  *
  *  Instead of a single atomic rule that fires Accept and both
- *  AcceptEntry actions in one shot, we split the Verifier into
+ *  AcceptEntry actions in one shot, the Verifier is split into
  *  four rules whose linear-fact chain forces the ordering:
  *      ReceiveReport -> CheckAIK -> CheckLeaf(L1) -> CheckLeaf(L2)
  *      -> Finalize

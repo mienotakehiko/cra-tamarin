@@ -19,7 +19,7 @@ Which mode is active is controlled by the environment variable
     PROTO_TPM_MODE=mock|swtpm      (default: mock)
 
 The Tamarin model treats the TPM Quote and the DICE signature as the
-generic  sign(payload, sk)  constructor; we mirror that here.  Every
+generic  sign(payload, sk)  constructor, mirrored here.  Every
 sign/verify function returns the same shape of (payload_bytes,
 signature_bytes) regardless of mode, so the aggregator and verifier
 code is identical between the two modes.
@@ -80,7 +80,7 @@ class TeeKey:
     """A TEE signing key (Ed25519, in-memory).
 
     In a real deployment this key lives inside ARM TrustZone or Intel TDX;
-    here we treat it as an in-memory stand-in.  The paper's threat model
+    here it is treated as an in-memory stand-in.  The paper's threat model
     explicitly abstracts the TEE as an isolated signer, so a software
     stand-in is faithful to the model.
     """

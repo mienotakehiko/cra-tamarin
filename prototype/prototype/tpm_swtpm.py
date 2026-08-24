@@ -29,7 +29,7 @@ Design in three parts:
                            the AK public key.
 
 Notes on scheme choice:
-    We use  rsa2048:rsassa-sha256 (RSA-PKCS1-v1.5-like) rather than
+    The backend uses  rsa2048:rsassa-sha256 (RSA-PKCS1-v1.5-like) rather than
     RSA-PSS because rsapss on restricted signing keys is fragile in
     the tpm2-tools 5.6 shipped with Ubuntu 24.04 (Esys returns 0x2D2
     "unsupported or incompatible scheme").  This is a *scheme* change,
@@ -119,11 +119,11 @@ class TpmSwtpmContext:
         """Start a swtpm or attach to a pre-existing one.
 
         If the environment variable SWTPM_SOCKET is set (pointing at
-        an already-running swtpm's server socket), we use that socket
-        directly and skip spawning our own daemon.  This is the
+        an already-running swtpm's server socket), that socket is used
+        directly and no new daemon is spawned.  This is the
         recommended path on constrained containers where in-process
-        forking of long-lived children is fragile.  Otherwise we spawn
-        our own swtpm under `self.tpm_dir` (setsid + background).
+        forking of long-lived children is fragile.  Otherwise a dedicated
+        swtpm is spawned under `self.tpm_dir` (setsid + background).
         """
         sock_env = os.environ.get("SWTPM_SOCKET")
         if sock_env:
@@ -326,7 +326,7 @@ class SwtpmAikKey:
     """An AIK realised by a running TpmSwtpmContext.
 
     The paper's Tamarin algebra treats the AIK signature as an opaque
-    sign(payload, sk) blob; for the swtpm backend we materialise this
+    sign(payload, sk) blob; for the swtpm backend this is materialised
     as (attest_blob, sig) so the verifier can also parse the TPM's own
     freshness / PCR fields.  The wire format hides this dichotomy so
     higher-level code (aggregator.py, verifier.py) is agnostic.
@@ -377,7 +377,7 @@ def verify_aik_swtpm(pk_bytes: bytes, payload: bytes, sig_blob: bytes) -> bool:
            against pk_bytes.
 
     Step 3 is the D2 anchor -- it is what binds the AIK signature to
-    our extended application payload.
+    the extended application payload.
     Step 4 is the standard TPM attestation-signature check.
     """
     try:
@@ -394,7 +394,7 @@ def verify_aik_swtpm(pk_bytes: bytes, payload: bytes, sig_blob: bytes) -> bool:
         #   UINT32  magic          (0xff544347 = "\xffTCG")
         #   UINT16  type
         #   TPM2B_NAME qualifiedSigner
-        #   TPM2B_DATA extraData    <-- what we need
+        #   TPM2B_DATA extraData    <-- the field needed here
         #   TPMS_CLOCK_INFO clockInfo
         #   UINT64  firmwareVersion
         #   TPMU_ATTEST attested

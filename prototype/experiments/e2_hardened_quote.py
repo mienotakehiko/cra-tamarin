@@ -6,7 +6,7 @@ payloads.  This keeps swtpm mode viable (a swtpm's transient-object
 slot only holds one AK), and it strengthens the like-for-like
 comparison because the same AK is timed on both branches.
 
-We check three things:
+The script checks three things:
 
     (a) qualifyingData size stays within TPM 2.0's TPM2B_DATA 64 B cap
         for the hardened payload (32 B SHA-256 digest).

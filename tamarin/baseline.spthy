@@ -37,8 +37,8 @@ builtins:
 /* ---------------------------------------------------------------------------
  *  Abstracted primitives
  *  ------------------------------------------------------------------------
- *  We rely on the built-in `sign/verify` and `h/1`; no extra function symbols
- *  are required.  We tag messages by string constants ('LEAF_EV', 'AGG_EV',
+ *  The theories rely on the built-in `sign/verify` and `h/1`; no extra function
+ *  symbols are required.  Messages are tagged by string constants ('LEAF_EV', 'AGG_EV',
  *  ...) to keep the different signature contexts disjoint.
  * ------------------------------------------------------------------------- */
 
@@ -98,7 +98,7 @@ rule Verifier_StartSession:
  *
  *  NOTE (baseline): the transcript does NOT include the current epoch nor
  *  the challenge nonce.  A cross-session TEE reuse would be conceivable
- *  in more elaborate threat models; here we keep this simple and let the
+ *  in more elaborate threat models; here the model keeps this simple and lets the
  *  falsification arise elsewhere (coverage).
  * =========================================================================== */
 
@@ -169,7 +169,7 @@ rule Leaf_Attest:
  *  cannot tell the leaf's evidence is missing.
  *
  *  The rule "Aggregator_Quote" produces the Quote regardless of the
- *  child-evidence set.  We record the packed evidence set in an action
+ *  child-evidence set.  The rule records the packed evidence set in an action
  *  ForwardedEvSet so that lemmas can talk about which leaves the
  *  aggregator saw.
  * --------------------------------------------------------------------------- */
@@ -254,7 +254,7 @@ restriction Unique_Epoch:
 /* ===========================================================================
  *  9. Sources lemma
  *
- *  For each origin of a leaf-attestation signature we tell Tamarin either
+ *  For each origin of a leaf-attestation signature the model tells Tamarin either
  *  the leaf produced it honestly (LeafAttested action recorded), or the
  *  adversary knew the CDI beforehand (a KU-fact chain).  This resolves the
  *  partial deconstructions triggered by Verifier_ParseEntry pattern-matching
@@ -266,7 +266,7 @@ restriction Unique_Epoch:
  * predicate, so Tamarin's constraint solver can trace `AcceptEntry` back
  * to either an honest `LeafAttested` or an adversary-known CDI, both of
  * which the built-in DY solver handles without a manual sources hint.
- * We therefore omit the [sources] lemma and rely on the automatic
+ * The [sources] lemma is therefore omitted in favour of the automatic
  * partial-deconstruction resolution.                                    */
 
 
@@ -332,7 +332,7 @@ lemma report_integrity:
  *  In this baseline the aggregator's Quote does not commit to the child
  *  evidence set, so an on-path adversary can drop LEAF_EV(L) between L and
  *  A and the verifier will still Accept.  Tamarin should produce an attack
- *  trace here that we cite as Figure 3 of the paper.
+ *  trace here that is cited as Figure 3 of the paper.
  * --------------------------------------------------------------------- */
 
 lemma cryptographic_coverage:

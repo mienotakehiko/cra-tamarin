@@ -141,7 +141,7 @@ class HardenedVerifier:
         if not verify_dice(self.leaf_pk_of[L2], p2, report.ev2):
             return None
 
-        # Only now do we build the AcceptedReport.  This is the atomic
+        # Only now is the AcceptedReport built.  This is the atomic
         # counterpart of the Tamarin rule emitting Accept and both
         # AcceptEntry actions in the same rule body.
         return AcceptedReport(

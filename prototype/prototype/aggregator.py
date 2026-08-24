@@ -55,7 +55,7 @@ class BaselineAggregator:
 
         `evset` is a list of (leaf_id, measurement, dice_signature).
         The aggregator's AIK signs *only* the fixed baseline payload;
-        the evset is not bound.  This is the vulnerability we exploit
+        the evset is not bound.  This is the vulnerability exploited
         in experiment E1.
         """
         payload = baseline_quote_payload(self.A, V, epoch, n)
