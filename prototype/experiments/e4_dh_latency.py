@@ -1,13 +1,14 @@
 """
-Experiment E4 -- auxiliary: TEE-TPM signed-DH latency.
+Experiment E4 (Q3, auxiliary): TEE-TPM signed-DH latency.
 
 Measures the wall-clock cost of one full signed-DH handshake between
 the aggregator's TEE and TPM stand-ins.  Corresponds to
     TEE_send + TPM_respond + TEE_finish
 in baseline.spthy / fixed.spthy (unchanged between the two).
 
-The experiment uses X25519 for the DH (fast, standard IoT choice), Ed25519 for the
-TEE and TPM transcript signatures, matching the crypto.py stand-ins.
+The experiment uses X25519 for the DH exchange (fast and common in IoT)
+and Ed25519 for the TEE and TPM transcript signatures, matching the
+crypto.py stand-ins.
 
 Run:
     PYTHONPATH=. python3 experiments/e4_dh_latency.py

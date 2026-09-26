@@ -1,12 +1,13 @@
 """
-Experiment E3 -- Q3: verify that HardenedVerifier.accept() is atomic.
+Experiment E3 (Q3): check that HardenedVerifier.accept() is atomic.
 
-Three adversarial reports are constructed and each is fed to the
-verifier 1000 times.  Success criterion:
+The script builds one honest and three adversarial reports and feeds
+each to the verifier N_RUNS times (default 1000 in mock mode, 100 in
+swtpm mode).  Success criterion:
     - R_all_good   : accept, both AcceptEntry emitted
     - R_bad_aik    : reject, ZERO AcceptEntry emitted
-    - R_bad_L1     : reject, ZERO AcceptEntry emitted for L2 either
-    - R_bad_L2     : reject, ZERO AcceptEntry emitted for L1 either
+    - R_bad_L1     : reject, ZERO AcceptEntry emitted (not even for L2)
+    - R_bad_L2     : reject, ZERO AcceptEntry emitted (not even for L1)
 
 Run:
     PYTHONPATH=. python3 experiments/e3_atomicity.py

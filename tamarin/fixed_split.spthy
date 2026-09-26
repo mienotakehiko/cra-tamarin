@@ -1,41 +1,31 @@
 /*
  * ============================================================================
- *  fixed.spthy
- *  submission -- companion artifact (2/2)
+ *  fixed_split.spthy
+ *  cra-tamarin companion artefact v1.1: hardened design, multi-step Verifier (Section 8)
  *
- *  Title    : Formal Analysis of Hierarchical Collective Remote Attestation
- *             with Heterogeneous TPM/DICE Roots of Trust in Tamarin
- *  Target   : IETF RATS (RFC 9334) Passport-model Composite Attester
- *             specialised to a two-level hierarchy with a two-leaf roster
- *             fixed at enrollment time.
+ *  Paper    : Formal Analysis of Hierarchical Collective Remote Attestation
+ *             with Heterogeneous TPM/DICE Roots of Trust in Tamarin Prover
+ *             (T. Mieno, BCE'27, Springer LNNS)
  *
- *  Version  : hardened.  Restores cryptographic_coverage that
- *             baseline.spthy falsified.
+ *  Same design as fixed.spthy with identical edits D1..D3.  A five-rule state
+ *  machine replaces the atomic Verifier rule (D4 in multi-step form), which
+ *  shows that coverage is a property of the design rather than of the atomic
+ *  modelling choice.
  *
- *  Diff w.r.t. baseline (see paper Section 8):
- *      D1: Enrollment authority commits an explicit two-leaf roster
- *          <L1,L2>  as a persistent fact !RosterOf($A, $L1, $L2).
- *      D2: The TPM Quote payload is extended from
- *              < 'AGG_EV', A, V, epoch, n >
- *          to  < 'AGG_EV', A, V, epoch, n,
- *                 h(<ev1, ev2>),                <-- child-evidence-set hash
- *                 h(<L1, L2>) >                 <-- roster hash
- *          where ev1, ev2 are the raw signatures of the two roster leaves.
- *      D3: Verifier_AcceptAggregate now takes ev1, ev2 explicitly and
- *          rebuilds the same hashes before checking the Quote signature.
- *      D4: Verifier_ParseEntry_Roster now consumes ev1 (or ev2) as
- *          extracted from the aggregate report, tying the AcceptEntry
- *          event to the same evidence blob that the Quote committed to.
+ *  Lemmas (identical text in every theory of the artefact):
+ *    executability          exists-trace  sanity: an honest run reaches Accept
+ *    key_secrecy            all-traces    TEE-TPM DH key secrecy
+ *    injective_agree_TEE    all-traces    TEE's injective agreement with TPM
+ *    freshness              all-traces    accepted report answers V's challenge
+ *    report_integrity       all-traces    per-leaf integrity of AcceptEntry
+ *    cryptographic_coverage all-traces    no honest roster leaf silently omitted
+ *    aggregate_binding      all-traces    accepted evidence = evidence the AIK
+ *                                         holder Quoted (added in v1.1)
  *
- *  Verified properties (all-traces unless noted):
- *      executability          [exists-trace]  proved
- *      key_secrecy                            proved
- *      injective_agree_TEE                    proved
- *      freshness                              proved
- *      report_integrity                       proved
- *      cryptographic_coverage                 proved  <-- restored
+ *  Expected: all seven lemmas verified.
  *
- *  Verified with tamarin-prover 1.12.0 + maude 3.2.
+ *  Toolchain: tamarin-prover 1.12.0; cross-checked with maude 3.2 and 3.5.1.
+ *  Expected results: see expected/fixed_split.txt
  * ============================================================================
  */
 
@@ -67,13 +57,13 @@ rule Register_AggrTEE:
     [ !LtkTEE($A, ~tsk), !PkTEE($A, pk(~tsk)), Out(pk(~tsk)) ]
 
 
-/* D1: Enrollment authority publishes an explicit two-leaf roster.
- *     The two leaves are recorded both individually (for the coverage
- *     lemma to quantify over each) and as an ordered pair (so the
- *     aggregator can compute the same hash the verifier will).          */
+/* D1: The Enrollment Authority publishes an explicit two-leaf roster.
+ *     The rule records the two leaves both individually (so that the
+ *     coverage lemma can quantify over each) and as an ordered pair (so
+ *     that the aggregator computes the same hash as the verifier).       */
 rule Publish_Roster:
     [ !LtkLeaf($L1, cdi1), !LtkLeaf($L2, cdi2), !LtkTPM($A, aik) ]
-  --[ RosterFixed($A, $L1, $L2),
+  --[ RosterFixed($A, $L1, $L2), RosterDistinct($L1, $L2),
       MemberOf($L1, $A), MemberOf($L2, $A),
       OnlyOnceR($A) ]->
     [ !RosterOf($A, $L1, $L2),
@@ -96,30 +86,30 @@ rule Verifier_StartSession:
  * =========================================================================== */
 
 rule TEE_send:
-    [ !LtkTEE($A, tsk), !PkTPM($A, pkTpm), Fr(~a) ]
-  --[ TEE_Started($A, 'g'^~a) ]->
-    [ Out(< $A, 'TEE_HELLO', 'g'^~a,
-            sign(<'TEE', $A, 'g'^~a>, tsk) >),
-      St_TEE($A, ~a, pkTpm) ]
+    [ !LtkTEE($A, tsk), !PkTPM($A, pkTpm), Fr(~ta) ]
+  --[ TEE_Started($A, 'g'^~ta) ]->
+    [ Out(< $A, 'TEE_HELLO', 'g'^~ta,
+            sign(<'TEE', $A, 'g'^~ta>, tsk) >),
+      St_TEE($A, ~ta, pkTpm) ]
 
 rule TPM_respond:
     let ga = ga_in
-        gb = 'g'^~b
+        gb = 'g'^~tb
     in
     [ !LtkTPM($A, aik), !PkTEE($A, pkTee),
       In(< $A, 'TEE_HELLO', ga_in, sig_tee >),
-      Fr(~b) ]
+      Fr(~tb) ]
   --[ Eq(verify(sig_tee, <'TEE', $A, ga_in>, pkTee), true),
       AgreeTPM($A, ga, gb),
       Running_TPM($A, ga, gb) ]->
     [ Out(< $A, 'TPM_ACK', gb, sign(<'TPM', $A, ga, gb>, aik) >),
-      St_TPM($A, ~b, ga) ]
+      St_TPM($A, ~tb, ga) ]
 
 rule TEE_finish:
-    let ga = 'g'^~a
-        k  = gb_in^~a
+    let ga = 'g'^~ta
+        k  = gb_in^~ta
     in
-    [ St_TEE($A, ~a, pkTpm),
+    [ St_TEE($A, ~ta, pkTpm),
       In(< $A, 'TPM_ACK', gb_in, sig_tpm >) ]
   --[ Eq(verify(sig_tpm, <'TPM', $A, ga, gb_in>, pkTpm), true),
       AgreeTEE($A, ga, gb_in),
@@ -148,9 +138,9 @@ rule Leaf_Attest:
 /* ===========================================================================
  *  5. Aggregator: HARDENED Quote generation
  *
- *  D2:  The aggregator now MUST receive the actual leaf signatures ev1, ev2
- *       from the two roster members and MUST include
- *           h(<ev1, ev2>)  and  h(<L1, L2>)
+ *  D2:  The aggregator now MUST receive the actual leaf evidence (m_i, ev_i)
+ *       of the two roster members and MUST include
+ *           h(<m1, ev1, m2, ev2>)  and  h(<L1, L2>)
  *       in the TPM Quote payload.
  *
  *  The channel between leaves and aggregator is still Dolev-Yao, but the
@@ -169,7 +159,7 @@ rule Aggregator_Quote_Fixed:
       In(<'CHAL', $V, $A, n, epoch>),
       In(<'LEAF_EV', $L1, $A, m1, ev1>),
       In(<'LEAF_EV', $L2, $A, m2, ev2>) ]
-  --[ AggrQuoted($A, $V, epoch, n, $L1, $L2, m1, m2),
+  --[ AggrQuoted($A, $V, epoch, n, <m1, m2>),
       UsedKey($A, k) ]->
     [ Out(< 'AGG_REPORT', $A, $V, epoch,
             $L1, $L2, m1, ev1, m2, ev2,
@@ -179,36 +169,17 @@ rule Aggregator_Quote_Fixed:
 /* ===========================================================================
  *  6. Verifier decisions (HARDENED)
  *
- *  D3, D4:  Verifier recomputes h(<ev1,ev2>) and h(<L1,L2>) itself and
- *           checks the Quote signature over the full payload.  It then
- *           parses each leaf signature (ev1, ev2) individually, so an
- *           AcceptEntry event is emitted per roster member.
+ *  D3:  Verifier_CheckAIK recomputes both hashes from the carried report
+ *       components and the Verifier's own !RosterOf before the AIK check.
+ *  D4 (multi-step form): instead of one atomic rule, the Verifier is a
+ *       five-rule state machine
+ *           ReceiveReport -> CheckAIK -> CheckLeaf_L1 -> CheckLeaf_L2
+ *           -> Finalize
+ *       connected by linear state facts that carry the full session tuple.
+ *       Each rule consumes its state fact exactly once, and only Finalize
+ *       emits Accept, i.e. after every per-leaf check.  The partial states
+ *       therefore appear explicitly on the trace.
  * =========================================================================== */
-
-/* D3/D4: Atomic verification.
- *
- *   In one rule the verifier
- *      (a) recomputes both hashes,
- *      (b) verifies the aggregate signature under AIK,
- *      (c) verifies BOTH leaf signatures under their respective PKs,
- *      (d) emits Accept AND both AcceptEntry actions.
- *
- *   Making it atomic is essential for cryptographic_coverage: coverage
- *   must hold *at the moment Accept fires*, not "eventually".
- */
-/* --------------------------------------------------------------
- *  MULTI-STEP VERIFIER  (reply to H2)
- *
- *  Instead of a single atomic rule that fires Accept and both
- *  AcceptEntry actions in one shot, the Verifier is split into
- *  four rules whose linear-fact chain forces the ordering:
- *      ReceiveReport -> CheckAIK -> CheckLeaf(L1) -> CheckLeaf(L2)
- *      -> Finalize
- *
- *  The linear facts (Receiving, AIKChecked, L1Checked, L2Checked)
- *  are consumed exactly once, so partial states are visible on the
- *  trace and can be quantified over by lemmas.
- * -------------------------------------------------------------- */
 
 rule Verifier_ReceiveReport:
     let payload = <'AGG_EV', $A, $V, epoch, n,
@@ -286,6 +257,9 @@ restriction Unique_TPMEnrollment:
 restriction Unique_TEEEnrollment:
     " All A #i #j. OnlyOnceE(A) @ i & OnlyOnceE(A) @ j ==> #i = #j "
 
+restriction Roster_Distinct:            /* v1.1: |R(A)| = 2 means two DISTINCT leaves */
+    " All x #i. RosterDistinct(x, x) @ i ==> F "
+
 restriction Unique_Roster:
     " All A #i #j. OnlyOnceR(A) @ i & OnlyOnceR(A) @ j ==> #i = #j "
 
@@ -337,23 +311,21 @@ lemma report_integrity:
           Ex n #j. LeafAttested(L, A, V, epoch, n, m) @ j & j < i "
 
 
-/* ---- Cryptographic coverage (should now be PROVED) ----
+/* (f) Cryptographic coverage
  *
- *  Statement (informal):
- *      If Verifier accepts an aggregate for A@epoch and L is a registered
- *      member of A's roster with L neither compromised nor with A's AIK
- *      revealed, then the Verifier has parsed a fresh AcceptEntry for L
- *      in the same session.
+ *  Informal statement:
+ *      If the Verifier accepts an aggregate for A at epoch, L is a
+ *      registered member of A's roster, L is not compromised, and A's AIK
+ *      is not revealed, then the Verifier has recorded an AcceptEntry for
+ *      L in the same session, no later than the Accept itself.
  *
- *  Why it holds now:
- *      Accept requires the Quote signature to verify against a payload
- *      that includes h(<L1, L2>).  Because the free-term algebra makes
- *      hashing injective at the symbolic level, the pair <$L1, $L2> in
- *      the Verifier's rule must equal the pair in the Aggregator's rule.
- *      Once these are equal, the Verifier's own Parse rules produce
- *      AcceptEntry for BOTH L1 and L2 (using ev1, ev2 which are also
- *      bound into the payload via h(<ev1, ev2>)).
- * ------------------------------------------------------------------ */
+ *  Why it holds in the hardened design:
+ *      Verifier_ReceiveReport reads the committed roster
+ *      !RosterOf(A, L1, L2) (D1), and every member L of A is L1 or L2
+ *      (Publish_Roster, Unique_Roster).  Finalize, the only rule that emits
+ *      Accept, consumes the state produced by both per-leaf checks and
+ *      emits AcceptEntry for BOTH L1 and L2 together with Accept.
+ */
 
 lemma cryptographic_coverage:
     " All V A epoch evset L #i #j.
@@ -363,7 +335,26 @@ lemma cryptographic_coverage:
         & not (Ex #r. CompromisedLeaf(L) @ r & r < i)
         & not (Ex #r. RevealedTPM(A) @ r & r < i)
       ==>
-          Ex m #k. AcceptEntry(V, A, epoch, L, m) @ k "
+          Ex m #k. AcceptEntry(V, A, epoch, L, m) @ k
+                 & (k < i | #k = #i) "
+
+/* (g) Aggregate binding (added in artefact v1.1)
+ *
+ *  If the Verifier accepts evidence set evset for session (A, epoch, n)
+ *  and A's AIK is not revealed, then A's aggregator actually Quoted
+ *  exactly that evidence set, for that Verifier, epoch and nonce.
+ *  Coverage (f) says "no honest roster leaf is missing"; binding (g) says
+ *  "what the Verifier accepted is what the AIK holder committed to".  The
+ *  ablation theories show that (f) needs D1 and D4, and (g) needs D2 and D3.
+ */
+
+lemma aggregate_binding:
+    " All V A epoch n evset #i.
+          Accept(V, A, epoch, evset) @ i
+        & AcceptedFrom(V, A, epoch, n) @ i
+        & not (Ex #r. RevealedTPM(A) @ r & r < i)
+      ==>
+          Ex #j. AggrQuoted(A, V, epoch, n, evset) @ j & j < i "
 
 end
 /* =========================== END OF FILE =============================== */

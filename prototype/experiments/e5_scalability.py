@@ -1,26 +1,24 @@
 """
-E5 -- scalability sweep over k.  Reply to reviewer issue H1.
+E5 (Q4): scalability sweep over the roster size k.
 
-For each k in K_VALUES, the script builds a k-leaf ad-hoc scenario using the
-existing 2-leaf Aggregator/Verifier as building blocks, and measure:
+For each k in K_VALUES, the script estimates:
 
   * Aggregator-side construction time
-    (equivalent to one AIK Quote plus O(k) hash cost).
+    (one AIK Quote plus k DICE verifications of the child evidence).
   * Verifier-side atomic-accept latency
     (one AIK verify plus k DICE verifies).
   * On-wire aggregate report size.
 
-Because the existing prototype's HardenedAggregator/HardenedVerifier
-are hard-coded to |R|=2, the script times the O(k) work in two additive parts:
+Because HardenedAggregator and HardenedVerifier are fixed at |R| = 2,
+the script composes the O(k) cost from measured unit costs:
 
   T_aggregate(k)  = T_quote  +  k * T_dice_verify
   T_verifier(k)   = T_quote_verify  +  k * T_dice_verify
   Wire(k)         = header + k * (leaf_id + measurement + dice_sig)
 
-The unit costs are drawn from the existing e1/e2 measurements and
-from a single Ed25519 verify benchmark included below.  The result
-gives the reviewer a scalability curve without having to modify the
-Tamarin theory.
+The script measures both unit costs itself, with an AIK sign/verify
+benchmark and an Ed25519 verify benchmark (see below).  The result is
+a scalability curve that requires no change to the Tamarin theories.
 
 Writes results/e5_scalability_{MODE}.csv.
 

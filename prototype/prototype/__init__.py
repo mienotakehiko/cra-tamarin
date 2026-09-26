@@ -1,1 +1,1 @@
-"""Companion prototype -- see prototype_plan.md for design intent."""
+"""Companion prototype of the cra-tamarin artefact; see ../README.md for an overview."""

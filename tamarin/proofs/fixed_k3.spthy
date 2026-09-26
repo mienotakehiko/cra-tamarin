@@ -1,0 +1,1740 @@
+theory HierarchicalCRA_Fixed_K3
+
+begin
+
+// Function signature and definition of the equational theory E
+
+builtins: diffie-hellman
+functions: fst/1, h/1, pair/2, pk/1, sign/2, snd/1, true/0, verify/3
+equations:
+    fst(<x.1, x.2>) = x.1,
+    snd(<x.1, x.2>) = x.2,
+    verify(sign(x.1, x.2), x.1, pk(x.2)) = true
+
+rule (modulo E) Register_LeafDICE:
+   [ Fr( ~cdi ) ]
+  --[ EnrolledLeaf( $L, ~cdi ), OnlyOnceL( $L ) ]->
+   [ !LtkLeaf( $L, ~cdi ), !PkLeaf( $L, pk(~cdi) ), Out( pk(~cdi) ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Register_AggrTPM:
+   [ Fr( ~aik ) ]
+  --[ EnrolledTPM( $A, ~aik ), OnlyOnceT( $A ) ]->
+   [ !LtkTPM( $A, ~aik ), !PkTPM( $A, pk(~aik) ), Out( pk(~aik) ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Register_AggrTEE:
+   [ Fr( ~tsk ) ]
+  --[ EnrolledTEE( $A, ~tsk ), OnlyOnceE( $A ) ]->
+   [ !LtkTEE( $A, ~tsk ), !PkTEE( $A, pk(~tsk) ), Out( pk(~tsk) ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Publish_Roster:
+   [
+   !LtkLeaf( $L1, cdi1 ), !LtkLeaf( $L2, cdi2 ), !LtkLeaf( $L3, cdi3 ),
+   !LtkTPM( $A, aik )
+   ]
+  --[
+  RosterFixed( $A, $L1, $L2, $L3 ), RosterDistinct( $L1, $L2 ),
+  RosterDistinct( $L1, $L3 ), RosterDistinct( $L2, $L3 ),
+  MemberOf( $L1, $A ), MemberOf( $L2, $A ), MemberOf( $L3, $A ),
+  OnlyOnceR( $A )
+  ]->
+   [
+   !RosterOf( $A, $L1, $L2, $L3 ), !Member( $L1, $A ), !Member( $L2, $A ),
+   !Member( $L3, $A )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Verifier_StartSession:
+   [ Fr( ~n ), Fr( ~epoch ) ]
+  --[ SessionStart( $V, $A, ~n, ~epoch ), UniqueEpoch( ~epoch ) ]->
+   [ Out( <'CHAL', $V, $A, ~n, ~epoch> ), !Session( $V, $A, ~n, ~epoch ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) TEE_send:
+   [ !LtkTEE( $A, tsk ), !PkTPM( $A, pkTpm ), Fr( ~ta ) ]
+  --[ TEE_Started( $A, 'g'^~ta ) ]->
+   [
+   Out( <$A, 'TEE_HELLO', 'g'^~ta, sign(<'TEE', $A, 'g'^~ta>, tsk)> ),
+   St_TEE( $A, ~ta, pkTpm )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) TPM_respond:
+   [
+   !LtkTPM( $A, aik ), !PkTEE( $A, pkTee ),
+   In( <$A, 'TEE_HELLO', ga_in, sig_tee> ), Fr( ~tb )
+   ]
+  --[
+  Eq( verify(sig_tee, <'TEE', $A, ga_in>, pkTee), true ),
+  AgreeTPM( $A, ga_in, 'g'^~tb ), Running_TPM( $A, ga_in, 'g'^~tb )
+  ]->
+   [
+   Out( <$A, 'TPM_ACK', 'g'^~tb, sign(<'TPM', $A, ga_in, 'g'^~tb>, aik)> ),
+   St_TPM( $A, ~tb, ga_in )
+   ]
+
+  /*
+  rule (modulo AC) TPM_respond:
+     [
+     !LtkTPM( $A, aik ), !PkTEE( $A, pkTee ),
+     In( <$A, 'TEE_HELLO', ga_in, sig_tee> ), Fr( ~tb )
+     ]
+    --[
+    Eq( z, true ), AgreeTPM( $A, ga_in, 'g'^~tb ),
+    Running_TPM( $A, ga_in, 'g'^~tb )
+    ]->
+     [
+     Out( <$A, 'TPM_ACK', 'g'^~tb, sign(<'TPM', $A, ga_in, 'g'^~tb>, aik)> ),
+     St_TPM( $A, ~tb, ga_in )
+     ]
+    variants (modulo AC)
+    1. $A    = $A.18
+       ga_in = ga_in.21
+       pkTee = pkTee.22
+       sig_tee
+             = sig_tee.23
+       z     = verify(sig_tee.23, <'TEE', $A.18, ga_in.21>, pkTee.22)
+    
+    2. $A    = $A.95
+       ga_in = ga_in.98
+       pkTee = pk(x.188)
+       sig_tee
+             = sign(<'TEE', $A.95, ga_in.98>, x.188)
+       z     = true
+  */
+
+rule (modulo E) TEE_finish:
+   [ St_TEE( $A, ~ta, pkTpm ), In( <$A, 'TPM_ACK', gb_in, sig_tpm> ) ]
+  --[
+  Eq( verify(sig_tpm, <'TPM', $A, 'g'^~ta, gb_in>, pkTpm), true ),
+  AgreeTEE( $A, 'g'^~ta, gb_in ), Commit_TEE( $A, 'g'^~ta, gb_in ),
+  SessionKey( $A, gb_in^~ta ), SecretKey( gb_in^~ta )
+  ]->
+   [ !TEETPMKey( $A, gb_in^~ta ) ]
+
+  /*
+  rule (modulo AC) TEE_finish:
+     [ St_TEE( $A, ~ta, pkTpm ), In( <$A, 'TPM_ACK', gb_in, sig_tpm> ) ]
+    --[
+    Eq( z.1, true ), AgreeTEE( $A, 'g'^~ta, gb_in ),
+    Commit_TEE( $A, 'g'^~ta, gb_in ), SessionKey( $A, z ), SecretKey( z )
+    ]->
+     [ !TEETPMKey( $A, z ) ]
+    variants (modulo AC)
+     1. $A    = $A.14
+        ~ta   = ~ta.15
+        gb_in = gb_in.16
+        pkTpm = pkTpm.17
+        sig_tpm
+              = sig_tpm.18
+        z     = gb_in.16^~ta.15
+        z.1   = verify(sig_tpm.18, <'TPM', $A.14, 'g'^~ta.15, gb_in.16>,
+                       pkTpm.17)
+    
+     2. $A    = $A.14
+        ~ta   = ~ta.15
+        gb_in = DH_neutral
+        pkTpm = pkTpm.17
+        sig_tpm
+              = sig_tpm.18
+        z     = DH_neutral
+        z.1   = verify(sig_tpm.18, <'TPM', $A.14, 'g'^~ta.15, DH_neutral>,
+                       pkTpm.17)
+    
+     3. $A    = $A.16
+        ~ta   = ~ta.17
+        gb_in = z.22^inv(~ta.17)
+        pkTpm = pkTpm.19
+        sig_tpm
+              = sig_tpm.20
+        z     = z.22
+        z.1   = verify(sig_tpm.20, <'TPM', $A.16, 'g'^~ta.17, z.22^inv(~ta.17)>,
+                       pkTpm.19)
+    
+     4. $A    = $A.57
+        ~ta   = ~ta.58
+        gb_in = x.111^x.112
+        pkTpm = pkTpm.60
+        sig_tpm
+              = sig_tpm.61
+        z     = x.111^(~ta.58*x.112)
+        z.1   = verify(sig_tpm.61, <'TPM', $A.57, 'g'^~ta.58, x.111^x.112>,
+                       pkTpm.60)
+    
+     5. $A    = $A.58
+        ~ta   = ~ta.59
+        gb_in = DH_neutral
+        pkTpm = pk(x.114)
+        sig_tpm
+              = sign(<'TPM', $A.58, 'g'^~ta.59, DH_neutral>, x.114)
+        z     = DH_neutral
+        z.1   = true
+    
+     6. $A    = $A.58
+        ~ta   = ~ta.59
+        gb_in = x.113^inv((~ta.59*x.114))
+        pkTpm = pkTpm.61
+        sig_tpm
+              = sig_tpm.62
+        z     = x.113^inv(x.114)
+        z.1   = verify(sig_tpm.62,
+                       <'TPM', $A.58, 'g'^~ta.59, x.113^inv((~ta.59*x.114))>, pkTpm.61)
+    
+     7. $A    = $A.58
+        ~ta   = ~ta.59
+        gb_in = x.113^(x.114*inv(~ta.59))
+        pkTpm = pkTpm.61
+        sig_tpm
+              = sig_tpm.62
+        z     = x.113^x.114
+        z.1   = verify(sig_tpm.62,
+                       <'TPM', $A.58, 'g'^~ta.59, x.113^(x.114*inv(~ta.59))>, pkTpm.61)
+    
+     8. $A    = $A.59
+        ~ta   = ~ta.60
+        gb_in = gb_in.61
+        pkTpm = pk(x.116)
+        sig_tpm
+              = sign(<'TPM', $A.59, 'g'^~ta.60, gb_in.61>, x.116)
+        z     = gb_in.61^~ta.60
+        z.1   = true
+    
+     9. $A    = $A.59
+        ~ta   = ~ta.60
+        gb_in = z.65^inv(~ta.60)
+        pkTpm = pk(x.116)
+        sig_tpm
+              = sign(<'TPM', $A.59, 'g'^~ta.60, z.65^inv(~ta.60)>, x.116)
+        z     = z.65
+        z.1   = true
+    
+    10. $A    = $A.59
+        ~ta   = ~ta.60
+        gb_in = x.114^(x.115*inv((~ta.60*x.116)))
+        pkTpm = pkTpm.62
+        sig_tpm
+              = sig_tpm.63
+        z     = x.114^(x.115*inv(x.116))
+        z.1   = verify(sig_tpm.63,
+                       <'TPM', $A.59, 'g'^~ta.60, x.114^(x.115*inv((~ta.60*x.116)))>, pkTpm.62)
+    
+    11. $A    = $A.60
+        ~ta   = ~ta.61
+        gb_in = x.116^x.117
+        pkTpm = pk(x.118)
+        sig_tpm
+              = sign(<'TPM', $A.60, 'g'^~ta.61, x.116^x.117>, x.118)
+        z     = x.116^(~ta.61*x.117)
+        z.1   = true
+    
+    12. $A    = $A.60
+        ~ta   = ~ta.61
+        gb_in = x.116^inv((~ta.61*x.117))
+        pkTpm = pk(x.118)
+        sig_tpm
+              = sign(<'TPM', $A.60, 'g'^~ta.61, x.116^inv((~ta.61*x.117))>, x.118)
+        z     = x.116^inv(x.117)
+        z.1   = true
+    
+    13. $A    = $A.60
+        ~ta   = ~ta.61
+        gb_in = x.116^(x.117*inv(~ta.61))
+        pkTpm = pk(x.118)
+        sig_tpm
+              = sign(<'TPM', $A.60, 'g'^~ta.61, x.116^(x.117*inv(~ta.61))>, x.118)
+        z     = x.116^x.117
+        z.1   = true
+    
+    14. $A    = $A.61
+        ~ta   = ~ta.62
+        gb_in = x.117^(x.118*inv((~ta.62*x.119)))
+        pkTpm = pk(x.120)
+        sig_tpm
+              = sign(<'TPM', $A.61, 'g'^~ta.62, x.117^(x.118*inv((~ta.62*x.119)))>,
+                     x.120)
+        z     = x.117^(x.118*inv(x.119))
+        z.1   = true
+  */
+
+rule (modulo E) Leaf_Attest:
+   [
+   !LtkLeaf( $L, cdi ), !Member( $L, $A ), In( <'CHAL', $V, $A, n, epoch> ),
+   Fr( ~m )
+   ]
+  --[ LeafAttested( $L, $A, $V, epoch, n, ~m ), LeafMeasurement( $L, ~m )
+  ]->
+   [
+   Out( <'LEAF_EV', $L, $A, ~m, 
+         sign(<'LEAF_EV', $L, $A, $V, epoch, n, ~m>, cdi)>
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Aggregator_Quote_Fixed:
+   [
+   !LtkTPM( $A, aik ), !TEETPMKey( $A, k ), !RosterOf( $A, $L1, $L2, $L3 ),
+   In( <'CHAL', $V, $A, n, epoch> ), In( <'LEAF_EV', $L1, $A, m1, ev1> ),
+   In( <'LEAF_EV', $L2, $A, m2, ev2> ), In( <'LEAF_EV', $L3, $A, m3, ev3> )
+   ]
+  --[ AggrQuoted( $A, $V, epoch, n, <m1, m2, m3> ), UsedKey( $A, k ) ]->
+   [
+   Out( <'AGG_REPORT', $A, $V, epoch, $L1, $L2, $L3, m1, ev1, m2, ev2, m3, 
+         ev3, 
+         sign(<'AGG_EV', $A, $V, epoch, n, h(<m1, ev1, m2, ev2, m3, ev3>), 
+               h(<$L1, $L2, $L3>)>,
+              aik)
+        >
+   )
+   ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Verifier_AcceptAggregate_Fixed:
+   [
+   !Session( $V, $A, n, epoch ), !PkTPM( $A, pkTpm ), !PkLeaf( $L1, pkL1 ),
+   !PkLeaf( $L2, pkL2 ), !PkLeaf( $L3, pkL3 ),
+   !RosterOf( $A, $L1, $L2, $L3 ),
+   In( <'AGG_REPORT', $A, $V, epoch, $L1, $L2, $L3, m1, ev1, m2, ev2, m3, 
+        ev3, sig_agg>
+   )
+   ]
+  --[
+  Eq( verify(sig_agg,
+             <'AGG_EV', $A, $V, epoch, n, h(<m1, ev1, m2, ev2, m3, ev3>), 
+              h(<$L1, $L2, $L3>)>,
+             pkTpm),
+      true
+  ),
+  Eq( verify(ev1, <'LEAF_EV', $L1, $A, $V, epoch, n, m1>, pkL1), true ),
+  Eq( verify(ev2, <'LEAF_EV', $L2, $A, $V, epoch, n, m2>, pkL2), true ),
+  Eq( verify(ev3, <'LEAF_EV', $L3, $A, $V, epoch, n, m3>, pkL3), true ),
+  Accept( $V, $A, epoch, <m1, m2, m3> ), AcceptedFrom( $V, $A, epoch, n ),
+  AcceptEntry( $V, $A, epoch, $L1, m1 ),
+  AcceptEntry( $V, $A, epoch, $L2, m2 ),
+  AcceptEntry( $V, $A, epoch, $L3, m3 )
+  ]->
+   [ ]
+
+  /*
+  rule (modulo AC) Verifier_AcceptAggregate_Fixed:
+     [
+     !Session( $V, $A, n, epoch ), !PkTPM( $A, pkTpm ), !PkLeaf( $L1, pkL1 ),
+     !PkLeaf( $L2, pkL2 ), !PkLeaf( $L3, pkL3 ),
+     !RosterOf( $A, $L1, $L2, $L3 ),
+     In( <'AGG_REPORT', $A, $V, epoch, $L1, $L2, $L3, m1, ev1, m2, ev2, m3, 
+          ev3, sig_agg>
+     )
+     ]
+    --[
+    Eq( z, true ), Eq( z.1, true ), Eq( z.2, true ), Eq( z.3, true ),
+    Accept( $V, $A, epoch, <m1, m2, m3> ), AcceptedFrom( $V, $A, epoch, n ),
+    AcceptEntry( $V, $A, epoch, $L1, m1 ),
+    AcceptEntry( $V, $A, epoch, $L2, m2 ),
+    AcceptEntry( $V, $A, epoch, $L3, m3 )
+    ]->
+     [ ]
+    variants (modulo AC)
+     1. $A    = $A.25
+        $L1   = $L1.26
+        $L2   = $L2.27
+        $L3   = $L3.28
+        $V    = $V.29
+        epoch = epoch.30
+        ev1   = ev1.31
+        ev2   = ev2.32
+        ev3   = ev3.33
+        m1    = m1.34
+        m2    = m2.35
+        m3    = m3.36
+        n     = n.37
+        pkL1  = pkL1.38
+        pkL2  = pkL2.39
+        pkL3  = pkL3.40
+        pkTpm = pkTpm.41
+        sig_agg
+              = sig_agg.42
+        z     = verify(sig_agg.42,
+                       <'AGG_EV', $A.25, $V.29, epoch.30, n.37, 
+                        h(<m1.34, ev1.31, m2.35, ev2.32, m3.36, ev3.33>), 
+                        h(<$L1.26, $L2.27, $L3.28>)>,
+                       pkTpm.41)
+        z.1   = verify(ev1.31,
+                       <'LEAF_EV', $L1.26, $A.25, $V.29, epoch.30, n.37, m1.34>, pkL1.38)
+        z.2   = verify(ev2.32,
+                       <'LEAF_EV', $L2.27, $A.25, $V.29, epoch.30, n.37, m2.35>, pkL2.39)
+        z.3   = verify(ev3.33,
+                       <'LEAF_EV', $L3.28, $A.25, $V.29, epoch.30, n.37, m3.36>, pkL3.40)
+    
+     2. $A    = $A.34
+        $L1   = $L1.35
+        $L2   = $L2.36
+        $L3   = $L3.37
+        $V    = $V.38
+        epoch = epoch.39
+        ev1   = sign(<'LEAF_EV', $L1.35, $A.34, $V.38, epoch.39, n.46, m1.43>,
+                     x.65)
+        ev2   = ev2.41
+        ev3   = ev3.42
+        m1    = m1.43
+        m2    = m2.44
+        m3    = m3.45
+        n     = n.46
+        pkL1  = pk(x.65)
+        pkL2  = pkL2.48
+        pkL3  = pkL3.49
+        pkTpm = pkTpm.50
+        sig_agg
+              = sig_agg.51
+        z     = verify(sig_agg.51,
+                       <'AGG_EV', $A.34, $V.38, epoch.39, n.46, 
+                        h(<m1.43, 
+                           sign(<'LEAF_EV', $L1.35, $A.34, $V.38, epoch.39, n.46, m1.43>, x.65), 
+                           m2.44, ev2.41, m3.45, ev3.42>), 
+                        h(<$L1.35, $L2.36, $L3.37>)>,
+                       pkTpm.50)
+        z.1   = true
+        z.2   = verify(ev2.41,
+                       <'LEAF_EV', $L2.36, $A.34, $V.38, epoch.39, n.46, m2.44>, pkL2.48)
+        z.3   = verify(ev3.42,
+                       <'LEAF_EV', $L3.37, $A.34, $V.38, epoch.39, n.46, m3.45>, pkL3.49)
+    
+     3. $A    = $A.35
+        $L1   = $L1.36
+        $L2   = $L2.37
+        $L3   = $L3.38
+        $V    = $V.39
+        epoch = epoch.40
+        ev1   = ev1.41
+        ev2   = sign(<'LEAF_EV', $L2.37, $A.35, $V.39, epoch.40, n.47, m2.45>,
+                     x.67)
+        ev3   = ev3.43
+        m1    = m1.44
+        m2    = m2.45
+        m3    = m3.46
+        n     = n.47
+        pkL1  = pkL1.48
+        pkL2  = pk(x.67)
+        pkL3  = pkL3.50
+        pkTpm = pkTpm.51
+        sig_agg
+              = sig_agg.52
+        z     = verify(sig_agg.52,
+                       <'AGG_EV', $A.35, $V.39, epoch.40, n.47, 
+                        h(<m1.44, ev1.41, m2.45, 
+                           sign(<'LEAF_EV', $L2.37, $A.35, $V.39, epoch.40, n.47, m2.45>, x.67), 
+                           m3.46, ev3.43>), 
+                        h(<$L1.36, $L2.37, $L3.38>)>,
+                       pkTpm.51)
+        z.1   = verify(ev1.41,
+                       <'LEAF_EV', $L1.36, $A.35, $V.39, epoch.40, n.47, m1.44>, pkL1.48)
+        z.2   = true
+        z.3   = verify(ev3.43,
+                       <'LEAF_EV', $L3.38, $A.35, $V.39, epoch.40, n.47, m3.46>, pkL3.50)
+    
+     4. $A    = $A.36
+        $L1   = $L1.37
+        $L2   = $L2.38
+        $L3   = $L3.39
+        $V    = $V.40
+        epoch = epoch.41
+        ev1   = ev1.42
+        ev2   = ev2.43
+        ev3   = sign(<'LEAF_EV', $L3.39, $A.36, $V.40, epoch.41, n.48, m3.47>,
+                     x.69)
+        m1    = m1.45
+        m2    = m2.46
+        m3    = m3.47
+        n     = n.48
+        pkL1  = pkL1.49
+        pkL2  = pkL2.50
+        pkL3  = pk(x.69)
+        pkTpm = pkTpm.52
+        sig_agg
+              = sig_agg.53
+        z     = verify(sig_agg.53,
+                       <'AGG_EV', $A.36, $V.40, epoch.41, n.48, 
+                        h(<m1.45, ev1.42, m2.46, ev2.43, m3.47, 
+                           sign(<'LEAF_EV', $L3.39, $A.36, $V.40, epoch.41, n.48, m3.47>, x.69)>), 
+                        h(<$L1.37, $L2.38, $L3.39>)>,
+                       pkTpm.52)
+        z.1   = verify(ev1.42,
+                       <'LEAF_EV', $L1.37, $A.36, $V.40, epoch.41, n.48, m1.45>, pkL1.49)
+        z.2   = verify(ev2.43,
+                       <'LEAF_EV', $L2.38, $A.36, $V.40, epoch.41, n.48, m2.46>, pkL2.50)
+        z.3   = true
+    
+     5. $A    = $A.36
+        $L1   = $L1.37
+        $L2   = $L2.38
+        $L3   = $L3.39
+        $V    = $V.40
+        epoch = epoch.41
+        ev1   = sign(<'LEAF_EV', $L1.37, $A.36, $V.40, epoch.41, n.48, m1.45>,
+                     x.67)
+        ev2   = sign(<'LEAF_EV', $L2.38, $A.36, $V.40, epoch.41, n.48, m2.46>,
+                     x.69)
+        ev3   = ev3.44
+        m1    = m1.45
+        m2    = m2.46
+        m3    = m3.47
+        n     = n.48
+        pkL1  = pk(x.67)
+        pkL2  = pk(x.69)
+        pkL3  = pkL3.51
+        pkTpm = pkTpm.52
+        sig_agg
+              = sig_agg.53
+        z     = verify(sig_agg.53,
+                       <'AGG_EV', $A.36, $V.40, epoch.41, n.48, 
+                        h(<m1.45, 
+                           sign(<'LEAF_EV', $L1.37, $A.36, $V.40, epoch.41, n.48, m1.45>, x.67), 
+                           m2.46, 
+                           sign(<'LEAF_EV', $L2.38, $A.36, $V.40, epoch.41, n.48, m2.46>, x.69), 
+                           m3.47, ev3.44>), 
+                        h(<$L1.37, $L2.38, $L3.39>)>,
+                       pkTpm.52)
+        z.1   = true
+        z.2   = true
+        z.3   = verify(ev3.44,
+                       <'LEAF_EV', $L3.39, $A.36, $V.40, epoch.41, n.48, m3.47>, pkL3.51)
+    
+     6. $A    = $A.37
+        $L1   = $L1.38
+        $L2   = $L2.39
+        $L3   = $L3.40
+        $V    = $V.41
+        epoch = epoch.42
+        ev1   = ev1.43
+        ev2   = sign(<'LEAF_EV', $L2.39, $A.37, $V.41, epoch.42, n.49, m2.47>,
+                     x.69)
+        ev3   = sign(<'LEAF_EV', $L3.40, $A.37, $V.41, epoch.42, n.49, m3.48>,
+                     x.71)
+        m1    = m1.46
+        m2    = m2.47
+        m3    = m3.48
+        n     = n.49
+        pkL1  = pkL1.50
+        pkL2  = pk(x.69)
+        pkL3  = pk(x.71)
+        pkTpm = pkTpm.53
+        sig_agg
+              = sig_agg.54
+        z     = verify(sig_agg.54,
+                       <'AGG_EV', $A.37, $V.41, epoch.42, n.49, 
+                        h(<m1.46, ev1.43, m2.47, 
+                           sign(<'LEAF_EV', $L2.39, $A.37, $V.41, epoch.42, n.49, m2.47>, x.69), 
+                           m3.48, 
+                           sign(<'LEAF_EV', $L3.40, $A.37, $V.41, epoch.42, n.49, m3.48>, x.71)>), 
+                        h(<$L1.38, $L2.39, $L3.40>)>,
+                       pkTpm.53)
+        z.1   = verify(ev1.43,
+                       <'LEAF_EV', $L1.38, $A.37, $V.41, epoch.42, n.49, m1.46>, pkL1.50)
+        z.2   = true
+        z.3   = true
+    
+     7. $A    = $A.37
+        $L1   = $L1.38
+        $L2   = $L2.39
+        $L3   = $L3.40
+        $V    = $V.41
+        epoch = epoch.42
+        ev1   = sign(<'LEAF_EV', $L1.38, $A.37, $V.41, epoch.42, n.49, m1.46>,
+                     x.68)
+        ev2   = ev2.44
+        ev3   = sign(<'LEAF_EV', $L3.40, $A.37, $V.41, epoch.42, n.49, m3.48>,
+                     x.71)
+        m1    = m1.46
+        m2    = m2.47
+        m3    = m3.48
+        n     = n.49
+        pkL1  = pk(x.68)
+        pkL2  = pkL2.51
+        pkL3  = pk(x.71)
+        pkTpm = pkTpm.53
+        sig_agg
+              = sig_agg.54
+        z     = verify(sig_agg.54,
+                       <'AGG_EV', $A.37, $V.41, epoch.42, n.49, 
+                        h(<m1.46, 
+                           sign(<'LEAF_EV', $L1.38, $A.37, $V.41, epoch.42, n.49, m1.46>, x.68), 
+                           m2.47, ev2.44, m3.48, 
+                           sign(<'LEAF_EV', $L3.40, $A.37, $V.41, epoch.42, n.49, m3.48>, x.71)>), 
+                        h(<$L1.38, $L2.39, $L3.40>)>,
+                       pkTpm.53)
+        z.1   = true
+        z.2   = verify(ev2.44,
+                       <'LEAF_EV', $L2.39, $A.37, $V.41, epoch.42, n.49, m2.47>, pkL2.51)
+        z.3   = true
+    
+     8. $A    = $A.38
+        $L1   = $L1.39
+        $L2   = $L2.40
+        $L3   = $L3.41
+        $V    = $V.42
+        epoch = epoch.43
+        ev1   = sign(<'LEAF_EV', $L1.39, $A.38, $V.42, epoch.43, n.50, m1.47>,
+                     x.69)
+        ev2   = sign(<'LEAF_EV', $L2.40, $A.38, $V.42, epoch.43, n.50, m2.48>,
+                     x.71)
+        ev3   = sign(<'LEAF_EV', $L3.41, $A.38, $V.42, epoch.43, n.50, m3.49>,
+                     x.73)
+        m1    = m1.47
+        m2    = m2.48
+        m3    = m3.49
+        n     = n.50
+        pkL1  = pk(x.69)
+        pkL2  = pk(x.71)
+        pkL3  = pk(x.73)
+        pkTpm = pkTpm.54
+        sig_agg
+              = sig_agg.55
+        z     = verify(sig_agg.55,
+                       <'AGG_EV', $A.38, $V.42, epoch.43, n.50, 
+                        h(<m1.47, 
+                           sign(<'LEAF_EV', $L1.39, $A.38, $V.42, epoch.43, n.50, m1.47>, x.69), 
+                           m2.48, 
+                           sign(<'LEAF_EV', $L2.40, $A.38, $V.42, epoch.43, n.50, m2.48>, x.71), 
+                           m3.49, 
+                           sign(<'LEAF_EV', $L3.41, $A.38, $V.42, epoch.43, n.50, m3.49>, x.73)>), 
+                        h(<$L1.39, $L2.40, $L3.41>)>,
+                       pkTpm.54)
+        z.1   = true
+        z.2   = true
+        z.3   = true
+    
+     9. $A    = $A.38
+        $L1   = $L1.39
+        $L2   = $L2.40
+        $L3   = $L3.41
+        $V    = $V.42
+        epoch = epoch.43
+        ev1   = sign(<'LEAF_EV', $L1.39, $A.38, $V.42, epoch.43, n.50, m1.47>,
+                     x.69)
+        ev2   = sign(<'LEAF_EV', $L2.40, $A.38, $V.42, epoch.43, n.50, m2.48>,
+                     x.71)
+        ev3   = sign(<'LEAF_EV', $L3.41, $A.38, $V.42, epoch.43, n.50, m3.49>,
+                     x.73)
+        m1    = m1.47
+        m2    = m2.48
+        m3    = m3.49
+        n     = n.50
+        pkL1  = pk(x.69)
+        pkL2  = pk(x.71)
+        pkL3  = pk(x.73)
+        pkTpm = pk(x.74)
+        sig_agg
+              = sign(<'AGG_EV', $A.38, $V.42, epoch.43, n.50, 
+                      h(<m1.47, 
+                         sign(<'LEAF_EV', $L1.39, $A.38, $V.42, epoch.43, n.50, m1.47>, x.69), 
+                         m2.48, 
+                         sign(<'LEAF_EV', $L2.40, $A.38, $V.42, epoch.43, n.50, m2.48>, x.71), 
+                         m3.49, 
+                         sign(<'LEAF_EV', $L3.41, $A.38, $V.42, epoch.43, n.50, m3.49>, x.73)>), 
+                      h(<$L1.39, $L2.40, $L3.41>)>,
+                     x.74)
+        z     = true
+        z.1   = true
+        z.2   = true
+        z.3   = true
+    
+    10. $A    = $A.40
+        $L1   = $L1.41
+        $L2   = $L2.42
+        $L3   = $L3.43
+        $V    = $V.44
+        epoch = epoch.45
+        ev1   = ev1.46
+        ev2   = sign(<'LEAF_EV', $L2.42, $A.40, $V.44, epoch.45, n.52, m2.50>,
+                     x.72)
+        ev3   = sign(<'LEAF_EV', $L3.43, $A.40, $V.44, epoch.45, n.52, m3.51>,
+                     x.74)
+        m1    = m1.49
+        m2    = m2.50
+        m3    = m3.51
+        n     = n.52
+        pkL1  = pkL1.53
+        pkL2  = pk(x.72)
+        pkL3  = pk(x.74)
+        pkTpm = pk(x.77)
+        sig_agg
+              = sign(<'AGG_EV', $A.40, $V.44, epoch.45, n.52, 
+                      h(<m1.49, ev1.46, m2.50, 
+                         sign(<'LEAF_EV', $L2.42, $A.40, $V.44, epoch.45, n.52, m2.50>, x.72), 
+                         m3.51, 
+                         sign(<'LEAF_EV', $L3.43, $A.40, $V.44, epoch.45, n.52, m3.51>, x.74)>), 
+                      h(<$L1.41, $L2.42, $L3.43>)>,
+                     x.77)
+        z     = true
+        z.1   = verify(ev1.46,
+                       <'LEAF_EV', $L1.41, $A.40, $V.44, epoch.45, n.52, m1.49>, pkL1.53)
+        z.2   = true
+        z.3   = true
+    
+    11. $A    = $A.40
+        $L1   = $L1.41
+        $L2   = $L2.42
+        $L3   = $L3.43
+        $V    = $V.44
+        epoch = epoch.45
+        ev1   = sign(<'LEAF_EV', $L1.41, $A.40, $V.44, epoch.45, n.52, m1.49>,
+                     x.71)
+        ev2   = ev2.47
+        ev3   = sign(<'LEAF_EV', $L3.43, $A.40, $V.44, epoch.45, n.52, m3.51>,
+                     x.74)
+        m1    = m1.49
+        m2    = m2.50
+        m3    = m3.51
+        n     = n.52
+        pkL1  = pk(x.71)
+        pkL2  = pkL2.54
+        pkL3  = pk(x.74)
+        pkTpm = pk(x.77)
+        sig_agg
+              = sign(<'AGG_EV', $A.40, $V.44, epoch.45, n.52, 
+                      h(<m1.49, 
+                         sign(<'LEAF_EV', $L1.41, $A.40, $V.44, epoch.45, n.52, m1.49>, x.71), 
+                         m2.50, ev2.47, m3.51, 
+                         sign(<'LEAF_EV', $L3.43, $A.40, $V.44, epoch.45, n.52, m3.51>, x.74)>), 
+                      h(<$L1.41, $L2.42, $L3.43>)>,
+                     x.77)
+        z     = true
+        z.1   = true
+        z.2   = verify(ev2.47,
+                       <'LEAF_EV', $L2.42, $A.40, $V.44, epoch.45, n.52, m2.50>, pkL2.54)
+        z.3   = true
+    
+    12. $A    = $A.40
+        $L1   = $L1.41
+        $L2   = $L2.42
+        $L3   = $L3.43
+        $V    = $V.44
+        epoch = epoch.45
+        ev1   = sign(<'LEAF_EV', $L1.41, $A.40, $V.44, epoch.45, n.52, m1.49>,
+                     x.71)
+        ev2   = sign(<'LEAF_EV', $L2.42, $A.40, $V.44, epoch.45, n.52, m2.50>,
+                     x.73)
+        ev3   = ev3.48
+        m1    = m1.49
+        m2    = m2.50
+        m3    = m3.51
+        n     = n.52
+        pkL1  = pk(x.71)
+        pkL2  = pk(x.73)
+        pkL3  = pkL3.55
+        pkTpm = pk(x.77)
+        sig_agg
+              = sign(<'AGG_EV', $A.40, $V.44, epoch.45, n.52, 
+                      h(<m1.49, 
+                         sign(<'LEAF_EV', $L1.41, $A.40, $V.44, epoch.45, n.52, m1.49>, x.71), 
+                         m2.50, 
+                         sign(<'LEAF_EV', $L2.42, $A.40, $V.44, epoch.45, n.52, m2.50>, x.73), 
+                         m3.51, ev3.48>), 
+                      h(<$L1.41, $L2.42, $L3.43>)>,
+                     x.77)
+        z     = true
+        z.1   = true
+        z.2   = true
+        z.3   = verify(ev3.48,
+                       <'LEAF_EV', $L3.43, $A.40, $V.44, epoch.45, n.52, m3.51>, pkL3.55)
+    
+    13. $A    = $A.41
+        $L1   = $L1.42
+        $L2   = $L2.43
+        $L3   = $L3.44
+        $V    = $V.45
+        epoch = epoch.46
+        ev1   = ev1.47
+        ev2   = ev2.48
+        ev3   = sign(<'LEAF_EV', $L3.44, $A.41, $V.45, epoch.46, n.53, m3.52>,
+                     x.74)
+        m1    = m1.50
+        m2    = m2.51
+        m3    = m3.52
+        n     = n.53
+        pkL1  = pkL1.54
+        pkL2  = pkL2.55
+        pkL3  = pk(x.74)
+        pkTpm = pk(x.79)
+        sig_agg
+              = sign(<'AGG_EV', $A.41, $V.45, epoch.46, n.53, 
+                      h(<m1.50, ev1.47, m2.51, ev2.48, m3.52, 
+                         sign(<'LEAF_EV', $L3.44, $A.41, $V.45, epoch.46, n.53, m3.52>, x.74)>), 
+                      h(<$L1.42, $L2.43, $L3.44>)>,
+                     x.79)
+        z     = true
+        z.1   = verify(ev1.47,
+                       <'LEAF_EV', $L1.42, $A.41, $V.45, epoch.46, n.53, m1.50>, pkL1.54)
+        z.2   = verify(ev2.48,
+                       <'LEAF_EV', $L2.43, $A.41, $V.45, epoch.46, n.53, m2.51>, pkL2.55)
+        z.3   = true
+    
+    14. $A    = $A.41
+        $L1   = $L1.42
+        $L2   = $L2.43
+        $L3   = $L3.44
+        $V    = $V.45
+        epoch = epoch.46
+        ev1   = ev1.47
+        ev2   = sign(<'LEAF_EV', $L2.43, $A.41, $V.45, epoch.46, n.53, m2.51>,
+                     x.73)
+        ev3   = ev3.49
+        m1    = m1.50
+        m2    = m2.51
+        m3    = m3.52
+        n     = n.53
+        pkL1  = pkL1.54
+        pkL2  = pk(x.73)
+        pkL3  = pkL3.56
+        pkTpm = pk(x.79)
+        sig_agg
+              = sign(<'AGG_EV', $A.41, $V.45, epoch.46, n.53, 
+                      h(<m1.50, ev1.47, m2.51, 
+                         sign(<'LEAF_EV', $L2.43, $A.41, $V.45, epoch.46, n.53, m2.51>, x.73), 
+                         m3.52, ev3.49>), 
+                      h(<$L1.42, $L2.43, $L3.44>)>,
+                     x.79)
+        z     = true
+        z.1   = verify(ev1.47,
+                       <'LEAF_EV', $L1.42, $A.41, $V.45, epoch.46, n.53, m1.50>, pkL1.54)
+        z.2   = true
+        z.3   = verify(ev3.49,
+                       <'LEAF_EV', $L3.44, $A.41, $V.45, epoch.46, n.53, m3.52>, pkL3.56)
+    
+    15. $A    = $A.41
+        $L1   = $L1.42
+        $L2   = $L2.43
+        $L3   = $L3.44
+        $V    = $V.45
+        epoch = epoch.46
+        ev1   = sign(<'LEAF_EV', $L1.42, $A.41, $V.45, epoch.46, n.53, m1.50>,
+                     x.72)
+        ev2   = ev2.48
+        ev3   = ev3.49
+        m1    = m1.50
+        m2    = m2.51
+        m3    = m3.52
+        n     = n.53
+        pkL1  = pk(x.72)
+        pkL2  = pkL2.55
+        pkL3  = pkL3.56
+        pkTpm = pk(x.79)
+        sig_agg
+              = sign(<'AGG_EV', $A.41, $V.45, epoch.46, n.53, 
+                      h(<m1.50, 
+                         sign(<'LEAF_EV', $L1.42, $A.41, $V.45, epoch.46, n.53, m1.50>, x.72), 
+                         m2.51, ev2.48, m3.52, ev3.49>), 
+                      h(<$L1.42, $L2.43, $L3.44>)>,
+                     x.79)
+        z     = true
+        z.1   = true
+        z.2   = verify(ev2.48,
+                       <'LEAF_EV', $L2.43, $A.41, $V.45, epoch.46, n.53, m2.51>, pkL2.55)
+        z.3   = verify(ev3.49,
+                       <'LEAF_EV', $L3.44, $A.41, $V.45, epoch.46, n.53, m3.52>, pkL3.56)
+    
+    16. $A    = $A.42
+        $L1   = $L1.43
+        $L2   = $L2.44
+        $L3   = $L3.45
+        $V    = $V.46
+        epoch = epoch.47
+        ev1   = ev1.48
+        ev2   = ev2.49
+        ev3   = ev3.50
+        m1    = m1.51
+        m2    = m2.52
+        m3    = m3.53
+        n     = n.54
+        pkL1  = pkL1.55
+        pkL2  = pkL2.56
+        pkL3  = pkL3.57
+        pkTpm = pk(x.81)
+        sig_agg
+              = sign(<'AGG_EV', $A.42, $V.46, epoch.47, n.54, 
+                      h(<m1.51, ev1.48, m2.52, ev2.49, m3.53, ev3.50>), 
+                      h(<$L1.43, $L2.44, $L3.45>)>,
+                     x.81)
+        z     = true
+        z.1   = verify(ev1.48,
+                       <'LEAF_EV', $L1.43, $A.42, $V.46, epoch.47, n.54, m1.51>, pkL1.55)
+        z.2   = verify(ev2.49,
+                       <'LEAF_EV', $L2.44, $A.42, $V.46, epoch.47, n.54, m2.52>, pkL2.56)
+        z.3   = verify(ev3.50,
+                       <'LEAF_EV', $L3.45, $A.42, $V.46, epoch.47, n.54, m3.53>, pkL3.57)
+  */
+
+rule (modulo E) Reveal_LtkTPM:
+   [ !LtkTPM( $A, aik ) ] --[ RevealedTPM( $A ) ]-> [ Out( aik ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Reveal_LtkTEE:
+   [ !LtkTEE( $A, tsk ) ] --[ RevealedTEE( $A ) ]-> [ Out( tsk ) ]
+
+  /* has exactly the trivial AC variant */
+
+rule (modulo E) Compromise_LeafSw:
+   [ !LtkLeaf( $L, cdi ) ] --[ CompromisedLeaf( $L ) ]-> [ Out( cdi ) ]
+
+  /* has exactly the trivial AC variant */
+
+restriction Equality:
+  "∀ x y #i. (Eq( x, y ) @ #i) ⇒ (x = y)"
+  // safety formula
+
+  /*
+  expanded formula:
+  "∀ x y #i. (Eq( x, y ) @ #i) ⇒ (x = y)"
+  */
+
+restriction Unique_LeafEnrollment:
+  "∀ L #i #j. ((OnlyOnceL( L ) @ #i) ∧ (OnlyOnceL( L ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+  /*
+  expanded formula:
+  "∀ L #i #j. ((OnlyOnceL( L ) @ #i) ∧ (OnlyOnceL( L ) @ #j)) ⇒ (#i = #j)"
+  */
+
+restriction Unique_TPMEnrollment:
+  "∀ A #i #j. ((OnlyOnceT( A ) @ #i) ∧ (OnlyOnceT( A ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+  /*
+  expanded formula:
+  "∀ A #i #j. ((OnlyOnceT( A ) @ #i) ∧ (OnlyOnceT( A ) @ #j)) ⇒ (#i = #j)"
+  */
+
+restriction Unique_TEEEnrollment:
+  "∀ A #i #j. ((OnlyOnceE( A ) @ #i) ∧ (OnlyOnceE( A ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+  /*
+  expanded formula:
+  "∀ A #i #j. ((OnlyOnceE( A ) @ #i) ∧ (OnlyOnceE( A ) @ #j)) ⇒ (#i = #j)"
+  */
+
+restriction Roster_Distinct:
+  "∀ x #i. (RosterDistinct( x, x ) @ #i) ⇒ (⊥)"
+  // safety formula
+
+  /*
+  expanded formula:
+  "∀ x #i. (RosterDistinct( x, x ) @ #i) ⇒ (⊥)"
+  */
+
+restriction Unique_Roster:
+  "∀ A #i #j. ((OnlyOnceR( A ) @ #i) ∧ (OnlyOnceR( A ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+  /*
+  expanded formula:
+  "∀ A #i #j. ((OnlyOnceR( A ) @ #i) ∧ (OnlyOnceR( A ) @ #j)) ⇒ (#i = #j)"
+  */
+
+restriction Unique_Epoch:
+  "∀ e #i #j.
+    ((UniqueEpoch( e ) @ #i) ∧ (UniqueEpoch( e ) @ #j)) ⇒ (#i = #j)"
+  // safety formula
+
+  /*
+  expanded formula:
+  "∀ e #i #j.
+    ((UniqueEpoch( e ) @ #i) ∧ (UniqueEpoch( e ) @ #j)) ⇒ (#i = #j)"
+  */
+
+lemma executability:
+  exists-trace
+  "∃ V A epoch evset #i.
+    (((Accept( V, A, epoch, evset ) @ #i) ∧
+      (¬(∃ X #j. RevealedTPM( X ) @ #j))) ∧
+     (¬(∃ X #j. RevealedTEE( X ) @ #j))) ∧
+    (¬(∃ X #j. CompromisedLeaf( X ) @ #j))"
+/*
+guarded formula characterizing all satisfying traces:
+"∃ V A epoch evset #i.
+  (Accept( V, A, epoch, evset ) @ #i)
+ ∧
+  (∀ X #j. (RevealedTPM( X ) @ #j) ⇒ ⊥) ∧
+  (∀ X #j. (RevealedTEE( X ) @ #j) ⇒ ⊥) ∧
+  (∀ X #j. (CompromisedLeaf( X ) @ #j) ⇒ ⊥)"
+*/
+simplify
+solve( !Session( $V, $A, n, epoch ) ▶₀ #i )
+  case Verifier_StartSession
+  solve( !PkTPM( $A, pk(x) ) ▶₁ #i )
+    case Register_AggrTPM
+    solve( !PkLeaf( $L1, pk(x) ) ▶₂ #i )
+      case Register_LeafDICE
+      solve( !PkLeaf( $L2, pk(x) ) ▶₃ #i )
+        case Register_LeafDICE
+        solve( !PkLeaf( $L3, pk(x) ) ▶₄ #i )
+          case Register_LeafDICE
+          solve( !RosterOf( $A, $L1, $L2, $L3 ) ▶₅ #i )
+            case Publish_Roster
+            solve( !KU( sign(<'LEAF_EV', $L1, $A, $V, ~epoch, ~n, m1>, ~cdi)
+                   ) @ #vk.17 )
+              case Leaf_Attest_case_1
+              solve( !KU( sign(<'LEAF_EV', $L2, $A, $V, ~epoch, ~n, m2>, ~cdi.1)
+                     ) @ #vk.24 )
+                case Leaf_Attest_case_2
+                solve( !KU( sign(<'LEAF_EV', $L3, $A, $V, ~epoch, ~n, m3>, ~cdi.2)
+                       ) @ #vk.29 )
+                  case Leaf_Attest_case_3
+                  solve( !KU( sign(<'AGG_EV', $A, $V, ~epoch, ~n, 
+                                    h(<~m, sign(<'LEAF_EV', $L1, $A, $V, ~epoch, ~n, ~m>, ~cdi), ~m.1, 
+                                       sign(<'LEAF_EV', $L2, $A, $V, ~epoch, ~n, ~m.1>, ~cdi.1), ~m.2, 
+                                       sign(<'LEAF_EV', $L3, $A, $V, ~epoch, ~n, ~m.2>, ~cdi.2)>), 
+                                    h(<$L1, $L2, $L3>)>,
+                                   ~aik)
+                         ) @ #vk.30 )
+                    case Aggregator_Quote_Fixed
+                    solve( !KU( sign(<'TPM', $A, 'g'^~ta, gb_in>, ~aik) ) @ #vk.51 )
+                      case TPM_respond
+                      solve( !KU( ~epoch ) @ #vk.38 )
+                        case Verifier_StartSession
+                        solve( !KU( ~n ) @ #vk.49 )
+                          case Verifier_StartSession
+                          solve( !KU( ~m ) @ #vk.46 )
+                            case Leaf_Attest
+                            solve( !KU( ~m.1 ) @ #vk.47 )
+                              case Leaf_Attest
+                              solve( !KU( ~m.2 ) @ #vk.48 )
+                                case Leaf_Attest
+                                solve( !KU( sign(<'TEE', $A, 'g'^~ta>, ~tsk) ) @ #vk.57 )
+                                  case TEE_send
+                                  solve( !KU( 'g'^~ta ) @ #vk.57 )
+                                    case TEE_send
+                                    solve( !KU( 'g'^~tb ) @ #vk.56 )
+                                      case TPM_respond
+                                      SOLVED // trace found
+                                    qed
+                                  qed
+                                qed
+                              qed
+                            qed
+                          qed
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma key_secrecy:
+  all-traces
+  "∀ A k #i.
+    (((SessionKey( A, k ) @ #i) ∧ (¬(∃ #j. RevealedTPM( A ) @ #j))) ∧
+     (¬(∃ #j. RevealedTEE( A ) @ #j))) ⇒
+    (¬(∃ #m. K( k ) @ #m))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ A k #i.
+  (SessionKey( A, k ) @ #i)
+ ∧
+  (∀ #j. (RevealedTPM( A ) @ #j) ⇒ ⊥) ∧
+  (∀ #j. (RevealedTEE( A ) @ #j) ⇒ ⊥) ∧
+  (∃ #m. (K( k ) @ #m))"
+*/
+simplify
+solve( St_TEE( $A, ~ta, pk(x) ) ▶₀ #i )
+  case TEE_send
+  solve( !KU( sign(<'TPM', $A, 'g'^~ta, gb_in>, ~aik) ) @ #vk.6 )
+    case TPM_respond
+    solve( !KU( 'g'^(~ta*~tb) ) @ #vk.8 )
+      case TEE_send
+      by solve( !KU( ~tb ) @ #vk.14 )
+    next
+      case TPM_respond
+      by solve( !KU( ~ta ) @ #vk.14 )
+    next
+      case c_exp
+      by solve( !KU( ~ta ) @ #vk.16 )
+    qed
+  next
+    case c_sign
+    solve( !KU( ~aik ) @ #vk.11 )
+      case Reveal_LtkTPM
+      by contradiction /* from formulas */
+    qed
+  qed
+qed
+
+lemma injective_agree_TEE:
+  all-traces
+  "∀ A ga gb #i.
+    ((Commit_TEE( A, ga, gb ) @ #i) ∧
+     (¬(∃ #r. (RevealedTPM( A ) @ #r) ∧ (#r < #i)))) ⇒
+    ((∃ #j. (Running_TPM( A, ga, gb ) @ #j) ∧ (#j < #i)) ∧
+     (¬(∃ A2 #i2. (Commit_TEE( A2, ga, gb ) @ #i2) ∧ (¬(#i = #i2)))))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ A ga gb #i.
+  (Commit_TEE( A, ga, gb ) @ #i)
+ ∧
+  (∀ #r. (RevealedTPM( A ) @ #r) ⇒ ¬(#r < #i)) ∧
+  (((∀ #j. (Running_TPM( A, ga, gb ) @ #j) ⇒ ¬(#j < #i)) ∨
+    (∃ A2 #i2. (Commit_TEE( A2, ga, gb ) @ #i2) ∧ ¬(#i = #i2))))"
+*/
+simplify
+solve( (∀ #j. (Running_TPM( $A, 'g'^~ta, gb ) @ #j) ⇒ ¬(#j < #i))  ∥
+       (∃ A2 #i2. (Commit_TEE( A2, 'g'^~ta, gb ) @ #i2) ∧ ¬(#i = #i2)) )
+  case case_1
+  solve( St_TEE( $A, ~ta, pk(x) ) ▶₀ #i )
+    case TEE_send
+    solve( !KU( sign(<'TPM', $A, 'g'^~ta, gb>, ~aik) ) @ #vk.6 )
+      case TPM_respond
+      by contradiction /* from formulas */
+    next
+      case c_sign
+      solve( !KU( ~aik ) @ #vk.10 )
+        case Reveal_LtkTPM
+        by contradiction /* from formulas */
+      qed
+    qed
+  qed
+next
+  case case_2
+  solve( (#i < #i2)  ∥ (#i2 < #i) )
+    case case_1
+    solve( St_TEE( $A, ~ta, pk(x) ) ▶₀ #i )
+      case TEE_send
+      solve( St_TEE( $A.1, ~ta, pk(x) ) ▶₀ #i2 )
+        case TEE_send
+        by contradiction /* cyclic */
+      qed
+    qed
+  next
+    case case_2
+    solve( St_TEE( $A, ~ta, pk(x) ) ▶₀ #i )
+      case TEE_send
+      solve( St_TEE( $A.1, ~ta, pk(x) ) ▶₀ #i2 )
+        case TEE_send
+        by contradiction /* cyclic */
+      qed
+    qed
+  qed
+qed
+
+lemma freshness:
+  all-traces
+  "∀ V A epoch n #i.
+    ((AcceptedFrom( V, A, epoch, n ) @ #i) ∧
+     (¬(∃ #r. (RevealedTPM( A ) @ #r) ∧ (#r < #i)))) ⇒
+    (∃ #j. (SessionStart( V, A, n, epoch ) @ #j) ∧ (#j < #i))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ V A epoch n #i.
+  (AcceptedFrom( V, A, epoch, n ) @ #i)
+ ∧
+  (∀ #r. (RevealedTPM( A ) @ #r) ⇒ ¬(#r < #i)) ∧
+  (∀ #j. (SessionStart( V, A, n, epoch ) @ #j) ⇒ ¬(#j < #i))"
+*/
+simplify
+solve( !Session( $V, $A, n, epoch ) ▶₀ #i )
+  case Verifier_StartSession
+  by contradiction /* from formulas */
+qed
+
+lemma report_integrity:
+  all-traces
+  "∀ V A epoch L m #i.
+    ((AcceptEntry( V, A, epoch, L, m ) @ #i) ∧
+     (¬(∃ #r. (CompromisedLeaf( L ) @ #r) ∧ (#r < #i)))) ⇒
+    (∃ n #j. (LeafAttested( L, A, V, epoch, n, m ) @ #j) ∧ (#j < #i))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ V A epoch L m #i.
+  (AcceptEntry( V, A, epoch, L, m ) @ #i)
+ ∧
+  (∀ #r. (CompromisedLeaf( L ) @ #r) ⇒ ¬(#r < #i)) ∧
+  (∀ n #j. (LeafAttested( L, A, V, epoch, n, m ) @ #j) ⇒ ¬(#j < #i))"
+*/
+simplify
+solve( AcceptEntry( V, A, epoch, L, m ) @ #i )
+  case Verifier_AcceptAggregate_Fixed_case_1
+  solve( !Session( $V, $A, n, epoch ) ▶₀ #i )
+    case Verifier_StartSession
+    solve( !PkTPM( $A, pk(x) ) ▶₁ #i )
+      case Register_AggrTPM
+      solve( !PkLeaf( $L1, pk(x) ) ▶₂ #i )
+        case Register_LeafDICE
+        solve( !PkLeaf( $L2, pk(x) ) ▶₃ #i )
+          case Register_LeafDICE
+          solve( !PkLeaf( $L3, pk(x) ) ▶₄ #i )
+            case Register_LeafDICE
+            solve( !RosterOf( $A, $L1, $L2, $L3 ) ▶₅ #i )
+              case Publish_Roster
+              solve( !KU( sign(<'LEAF_EV', $L1, $A, $V, ~epoch, ~n, m>, ~cdi)
+                     ) @ #vk.17 )
+                case Leaf_Attest_case_1
+                by contradiction /* from formulas */
+              next
+                case Leaf_Attest_case_2
+                by contradiction /* from formulas */
+              next
+                case Leaf_Attest_case_3
+                by contradiction /* from formulas */
+              next
+                case c_sign
+                solve( !KU( ~cdi ) @ #vk.33 )
+                  case Compromise_LeafSw
+                  by contradiction /* from formulas */
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+next
+  case Verifier_AcceptAggregate_Fixed_case_2
+  solve( !Session( $V, $A, n, epoch ) ▶₀ #i )
+    case Verifier_StartSession
+    solve( !PkTPM( $A, pk(x) ) ▶₁ #i )
+      case Register_AggrTPM
+      solve( !PkLeaf( $L1, pk(x) ) ▶₂ #i )
+        case Register_LeafDICE
+        solve( !PkLeaf( $L2, pk(x) ) ▶₃ #i )
+          case Register_LeafDICE
+          solve( !PkLeaf( $L3, pk(x) ) ▶₄ #i )
+            case Register_LeafDICE
+            solve( !RosterOf( $A, $L1, $L2, $L3 ) ▶₅ #i )
+              case Publish_Roster
+              solve( !KU( sign(<'LEAF_EV', $L1, $A, $V, ~epoch, ~n, m1>, ~cdi)
+                     ) @ #vk.17 )
+                case Leaf_Attest_case_1
+                solve( !KU( sign(<'LEAF_EV', $L2, $A, $V, ~epoch, ~n, m.1>, ~cdi.1)
+                       ) @ #vk.24 )
+                  case Leaf_Attest_case_1
+                  by contradiction /* from formulas */
+                next
+                  case Leaf_Attest_case_2
+                  by contradiction /* from formulas */
+                next
+                  case Leaf_Attest_case_3
+                  by contradiction /* from formulas */
+                next
+                  case c_sign
+                  solve( !KU( ~cdi.1 ) @ #vk.39 )
+                    case Compromise_LeafSw
+                    by contradiction /* from formulas */
+                  qed
+                qed
+              next
+                case Leaf_Attest_case_2
+                by contradiction /* from formulas */
+              next
+                case Leaf_Attest_case_3
+                by contradiction /* from formulas */
+              next
+                case c_sign
+                solve( !KU( ~cdi ) @ #vk.33 )
+                  case Compromise_LeafSw
+                  solve( !KU( sign(<'LEAF_EV', $L2, $A, $V, ~epoch, ~n, m>, ~cdi.1)
+                         ) @ #vk.28 )
+                    case Leaf_Attest_case_1
+                    by contradiction /* from formulas */
+                  next
+                    case Leaf_Attest_case_2
+                    by contradiction /* from formulas */
+                  next
+                    case Leaf_Attest_case_3
+                    by contradiction /* from formulas */
+                  next
+                    case c_sign
+                    solve( !KU( ~cdi.1 ) @ #vk.42 )
+                      case Compromise_LeafSw
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+next
+  case Verifier_AcceptAggregate_Fixed_case_3
+  solve( !Session( $V, $A, n, epoch ) ▶₀ #i )
+    case Verifier_StartSession
+    solve( !PkTPM( $A, pk(x) ) ▶₁ #i )
+      case Register_AggrTPM
+      solve( !PkLeaf( $L1, pk(x) ) ▶₂ #i )
+        case Register_LeafDICE
+        solve( !PkLeaf( $L2, pk(x) ) ▶₃ #i )
+          case Register_LeafDICE
+          solve( !PkLeaf( $L3, pk(x) ) ▶₄ #i )
+            case Register_LeafDICE
+            solve( !RosterOf( $A, $L1, $L2, $L3 ) ▶₅ #i )
+              case Publish_Roster
+              solve( !KU( sign(<'LEAF_EV', $L1, $A, $V, ~epoch, ~n, m1>, ~cdi)
+                     ) @ #vk.17 )
+                case Leaf_Attest_case_1
+                solve( !KU( sign(<'LEAF_EV', $L2, $A, $V, ~epoch, ~n, m2>, ~cdi.1)
+                       ) @ #vk.24 )
+                  case Leaf_Attest_case_1
+                  by contradiction /* from formulas */
+                next
+                  case Leaf_Attest_case_2
+                  solve( !KU( sign(<'LEAF_EV', $L3, $A, $V, ~epoch, ~n, m.2>, ~cdi.2)
+                         ) @ #vk.29 )
+                    case Leaf_Attest_case_1
+                    by contradiction /* from formulas */
+                  next
+                    case Leaf_Attest_case_2
+                    by contradiction /* from formulas */
+                  next
+                    case Leaf_Attest_case_3
+                    by contradiction /* from formulas */
+                  next
+                    case c_sign
+                    solve( !KU( ~cdi.2 ) @ #vk.39 )
+                      case Compromise_LeafSw
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                next
+                  case Leaf_Attest_case_3
+                  by contradiction /* from formulas */
+                next
+                  case c_sign
+                  solve( !KU( ~cdi.1 ) @ #vk.39 )
+                    case Compromise_LeafSw
+                    solve( !KU( sign(<'LEAF_EV', $L3, $A, $V, ~epoch, ~n, m.1>, ~cdi.2)
+                           ) @ #vk.36 )
+                      case Leaf_Attest_case_1
+                      by contradiction /* from formulas */
+                    next
+                      case Leaf_Attest_case_2
+                      by contradiction /* from formulas */
+                    next
+                      case Leaf_Attest_case_3
+                      by contradiction /* from formulas */
+                    next
+                      case c_sign
+                      solve( !KU( ~cdi.2 ) @ #vk.47 )
+                        case Compromise_LeafSw
+                        by contradiction /* from formulas */
+                      qed
+                    qed
+                  qed
+                qed
+              next
+                case Leaf_Attest_case_2
+                by contradiction /* from formulas */
+              next
+                case Leaf_Attest_case_3
+                by contradiction /* from formulas */
+              next
+                case c_sign
+                solve( !KU( ~cdi ) @ #vk.33 )
+                  case Compromise_LeafSw
+                  solve( !KU( sign(<'LEAF_EV', $L2, $A, $V, ~epoch, ~n, m2>, ~cdi.1)
+                         ) @ #vk.28 )
+                    case Leaf_Attest_case_1
+                    by contradiction /* from formulas */
+                  next
+                    case Leaf_Attest_case_2
+                    solve( !KU( sign(<'LEAF_EV', $L3, $A, $V, ~epoch, ~n, m.1>, ~cdi.2)
+                           ) @ #vk.35 )
+                      case Leaf_Attest_case_1
+                      by contradiction /* from formulas */
+                    next
+                      case Leaf_Attest_case_2
+                      by contradiction /* from formulas */
+                    next
+                      case Leaf_Attest_case_3
+                      by contradiction /* from formulas */
+                    next
+                      case c_sign
+                      solve( !KU( ~cdi.2 ) @ #vk.47 )
+                        case Compromise_LeafSw
+                        by contradiction /* from formulas */
+                      qed
+                    qed
+                  next
+                    case Leaf_Attest_case_3
+                    by contradiction /* from formulas */
+                  next
+                    case c_sign
+                    solve( !KU( ~cdi.1 ) @ #vk.42 )
+                      case Compromise_LeafSw
+                      solve( !KU( sign(<'LEAF_EV', $L3, $A, $V, ~epoch, ~n, m>, ~cdi.2)
+                             ) @ #vk.39 )
+                        case Leaf_Attest_case_1
+                        by contradiction /* from formulas */
+                      next
+                        case Leaf_Attest_case_2
+                        by contradiction /* from formulas */
+                      next
+                        case Leaf_Attest_case_3
+                        by contradiction /* from formulas */
+                      next
+                        case c_sign
+                        solve( !KU( ~cdi.2 ) @ #vk.49 )
+                          case Compromise_LeafSw
+                          by contradiction /* from formulas */
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma cryptographic_coverage:
+  all-traces
+  "∀ V A epoch evset L #i #j.
+    (((((Accept( V, A, epoch, evset ) @ #i) ∧ (MemberOf( L, A ) @ #j)) ∧
+       (#j < #i)) ∧
+      (¬(∃ #r. (CompromisedLeaf( L ) @ #r) ∧ (#r < #i)))) ∧
+     (¬(∃ #r. (RevealedTPM( A ) @ #r) ∧ (#r < #i)))) ⇒
+    (∃ m #k.
+      (AcceptEntry( V, A, epoch, L, m ) @ #k) ∧ ((#k < #i) ∨ (#k = #i)))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ V A epoch evset L #i #j.
+  (Accept( V, A, epoch, evset ) @ #i) ∧ (MemberOf( L, A ) @ #j)
+ ∧
+  (#j < #i) ∧
+  (∀ #r. (CompromisedLeaf( L ) @ #r) ⇒ ¬(#r < #i)) ∧
+  (∀ #r. (RevealedTPM( A ) @ #r) ⇒ ¬(#r < #i)) ∧
+  (∀ m #k.
+    (AcceptEntry( V, A, epoch, L, m ) @ #k) ⇒ (¬(#k < #i)) ∧ (¬(#k = #i)))"
+*/
+simplify
+solve( !Session( $V, $A, n, epoch ) ▶₀ #i )
+  case Verifier_StartSession
+  solve( !PkTPM( $A, pk(x) ) ▶₁ #i )
+    case Register_AggrTPM
+    solve( !PkLeaf( $L1, pk(x) ) ▶₂ #i )
+      case Register_LeafDICE
+      solve( !PkLeaf( $L2, pk(x) ) ▶₃ #i )
+        case Register_LeafDICE
+        solve( !PkLeaf( $L3, pk(x) ) ▶₄ #i )
+          case Register_LeafDICE
+          solve( !RosterOf( $A, $L1, $L2, $L3 ) ▶₅ #i )
+            case Publish_Roster
+            solve( MemberOf( L, $A ) @ #j )
+              case Publish_Roster_case_1
+              by contradiction /* from formulas */
+            next
+              case Publish_Roster_case_2
+              by contradiction /* from formulas */
+            next
+              case Publish_Roster_case_3
+              by contradiction /* from formulas */
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+lemma aggregate_binding:
+  all-traces
+  "∀ V A epoch n evset #i.
+    (((Accept( V, A, epoch, evset ) @ #i) ∧
+      (AcceptedFrom( V, A, epoch, n ) @ #i)) ∧
+     (¬(∃ #r. (RevealedTPM( A ) @ #r) ∧ (#r < #i)))) ⇒
+    (∃ #j. (AggrQuoted( A, V, epoch, n, evset ) @ #j) ∧ (#j < #i))"
+/*
+guarded formula characterizing all counter-examples:
+"∃ V A epoch n evset #i.
+  (Accept( V, A, epoch, evset ) @ #i) ∧
+  (AcceptedFrom( V, A, epoch, n ) @ #i)
+ ∧
+  (∀ #r. (RevealedTPM( A ) @ #r) ⇒ ¬(#r < #i)) ∧
+  (∀ #j. (AggrQuoted( A, V, epoch, n, evset ) @ #j) ⇒ ¬(#j < #i))"
+*/
+simplify
+solve( !Session( $V, $A, n, epoch ) ▶₀ #i )
+  case Verifier_StartSession
+  solve( !PkTPM( $A, pk(x) ) ▶₁ #i )
+    case Register_AggrTPM
+    solve( !PkLeaf( $L1, pk(x) ) ▶₂ #i )
+      case Register_LeafDICE
+      solve( !PkLeaf( $L2, pk(x) ) ▶₃ #i )
+        case Register_LeafDICE
+        solve( !PkLeaf( $L3, pk(x) ) ▶₄ #i )
+          case Register_LeafDICE
+          solve( !RosterOf( $A, $L1, $L2, $L3 ) ▶₅ #i )
+            case Publish_Roster
+            solve( !KU( sign(<'LEAF_EV', $L1, $A, $V, ~epoch, ~n, m1>, ~cdi)
+                   ) @ #vk.17 )
+              case Leaf_Attest_case_1
+              solve( !KU( sign(<'LEAF_EV', $L2, $A, $V, ~epoch, ~n, m2>, ~cdi.1)
+                     ) @ #vk.24 )
+                case Leaf_Attest_case_1
+                by contradiction /* from formulas */
+              next
+                case Leaf_Attest_case_2
+                solve( !KU( sign(<'LEAF_EV', $L3, $A, $V, ~epoch, ~n, m3>, ~cdi.2)
+                       ) @ #vk.29 )
+                  case Leaf_Attest_case_1
+                  by contradiction /* from formulas */
+                next
+                  case Leaf_Attest_case_2
+                  by contradiction /* from formulas */
+                next
+                  case Leaf_Attest_case_3
+                  solve( !KU( sign(<'AGG_EV', $A, $V, ~epoch, ~n, 
+                                    h(<~m, sign(<'LEAF_EV', $L1, $A, $V, ~epoch, ~n, ~m>, ~cdi), ~m.1, 
+                                       sign(<'LEAF_EV', $L2, $A, $V, ~epoch, ~n, ~m.1>, ~cdi.1), ~m.2, 
+                                       sign(<'LEAF_EV', $L3, $A, $V, ~epoch, ~n, ~m.2>, ~cdi.2)>), 
+                                    h(<$L1, $L2, $L3>)>,
+                                   ~aik)
+                         ) @ #vk.30 )
+                    case Aggregator_Quote_Fixed
+                    by contradiction /* from formulas */
+                  next
+                    case c_sign
+                    solve( !KU( ~aik ) @ #vk.38 )
+                      case Reveal_LtkTPM
+                      by contradiction /* from formulas */
+                    qed
+                  qed
+                next
+                  case c_sign
+                  solve( !KU( ~cdi.2 ) @ #vk.39 )
+                    case Compromise_LeafSw
+                    solve( !KU( sign(<'AGG_EV', $A, $V, ~epoch, ~n, 
+                                      h(<~m, sign(<'LEAF_EV', $L1, $A, $V, ~epoch, ~n, ~m>, ~cdi), ~m.1, 
+                                         sign(<'LEAF_EV', $L2, $A, $V, ~epoch, ~n, ~m.1>, ~cdi.1), m3, 
+                                         sign(<'LEAF_EV', $L3, $A, $V, ~epoch, ~n, m3>, ~cdi.2)>), 
+                                      h(<$L1, $L2, $L3>)>,
+                                     ~aik)
+                           ) @ #vk.37 )
+                      case Aggregator_Quote_Fixed
+                      by contradiction /* from formulas */
+                    next
+                      case c_sign
+                      solve( !KU( ~aik ) @ #vk.46 )
+                        case Reveal_LtkTPM
+                        by contradiction /* from formulas */
+                      qed
+                    qed
+                  qed
+                qed
+              next
+                case Leaf_Attest_case_3
+                by contradiction /* from formulas */
+              next
+                case c_sign
+                solve( !KU( ~cdi.1 ) @ #vk.39 )
+                  case Compromise_LeafSw
+                  solve( !KU( sign(<'LEAF_EV', $L3, $A, $V, ~epoch, ~n, m3>, ~cdi.2)
+                         ) @ #vk.36 )
+                    case Leaf_Attest_case_1
+                    by contradiction /* from formulas */
+                  next
+                    case Leaf_Attest_case_2
+                    by contradiction /* from formulas */
+                  next
+                    case Leaf_Attest_case_3
+                    solve( !KU( sign(<'AGG_EV', $A, $V, ~epoch, ~n, 
+                                      h(<~m, sign(<'LEAF_EV', $L1, $A, $V, ~epoch, ~n, ~m>, ~cdi), m2, 
+                                         sign(<'LEAF_EV', $L2, $A, $V, ~epoch, ~n, m2>, ~cdi.1), ~m.1, 
+                                         sign(<'LEAF_EV', $L3, $A, $V, ~epoch, ~n, ~m.1>, ~cdi.2)>), 
+                                      h(<$L1, $L2, $L3>)>,
+                                     ~aik)
+                           ) @ #vk.37 )
+                      case Aggregator_Quote_Fixed
+                      by contradiction /* from formulas */
+                    next
+                      case c_sign
+                      solve( !KU( ~aik ) @ #vk.46 )
+                        case Reveal_LtkTPM
+                        by contradiction /* from formulas */
+                      qed
+                    qed
+                  next
+                    case c_sign
+                    solve( !KU( ~cdi.2 ) @ #vk.47 )
+                      case Compromise_LeafSw
+                      solve( !KU( sign(<'AGG_EV', $A, $V, ~epoch, ~n, 
+                                        h(<~m, sign(<'LEAF_EV', $L1, $A, $V, ~epoch, ~n, ~m>, ~cdi), m2, 
+                                           sign(<'LEAF_EV', $L2, $A, $V, ~epoch, ~n, m2>, ~cdi.1), m3, 
+                                           sign(<'LEAF_EV', $L3, $A, $V, ~epoch, ~n, m3>, ~cdi.2)>), 
+                                        h(<$L1, $L2, $L3>)>,
+                                       ~aik)
+                             ) @ #vk.44 )
+                        case Aggregator_Quote_Fixed
+                        by contradiction /* from formulas */
+                      next
+                        case c_sign
+                        solve( !KU( ~aik ) @ #vk.53 )
+                          case Reveal_LtkTPM
+                          by contradiction /* from formulas */
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            next
+              case Leaf_Attest_case_2
+              by contradiction /* from formulas */
+            next
+              case Leaf_Attest_case_3
+              by contradiction /* from formulas */
+            next
+              case c_sign
+              solve( !KU( ~cdi ) @ #vk.33 )
+                case Compromise_LeafSw
+                solve( !KU( sign(<'LEAF_EV', $L2, $A, $V, ~epoch, ~n, m2>, ~cdi.1)
+                       ) @ #vk.28 )
+                  case Leaf_Attest_case_1
+                  by contradiction /* from formulas */
+                next
+                  case Leaf_Attest_case_2
+                  solve( !KU( sign(<'LEAF_EV', $L3, $A, $V, ~epoch, ~n, m3>, ~cdi.2)
+                         ) @ #vk.35 )
+                    case Leaf_Attest_case_1
+                    by contradiction /* from formulas */
+                  next
+                    case Leaf_Attest_case_2
+                    by contradiction /* from formulas */
+                  next
+                    case Leaf_Attest_case_3
+                    solve( !KU( sign(<'AGG_EV', $A, $V, ~epoch, ~n, 
+                                      h(<m1, sign(<'LEAF_EV', $L1, $A, $V, ~epoch, ~n, m1>, ~cdi), ~m, 
+                                         sign(<'LEAF_EV', $L2, $A, $V, ~epoch, ~n, ~m>, ~cdi.1), ~m.1, 
+                                         sign(<'LEAF_EV', $L3, $A, $V, ~epoch, ~n, ~m.1>, ~cdi.2)>), 
+                                      h(<$L1, $L2, $L3>)>,
+                                     ~aik)
+                           ) @ #vk.37 )
+                      case Aggregator_Quote_Fixed
+                      by contradiction /* from formulas */
+                    next
+                      case c_sign
+                      solve( !KU( ~aik ) @ #vk.46 )
+                        case Reveal_LtkTPM
+                        by contradiction /* from formulas */
+                      qed
+                    qed
+                  next
+                    case c_sign
+                    solve( !KU( ~cdi.2 ) @ #vk.47 )
+                      case Compromise_LeafSw
+                      solve( !KU( sign(<'AGG_EV', $A, $V, ~epoch, ~n, 
+                                        h(<m1, sign(<'LEAF_EV', $L1, $A, $V, ~epoch, ~n, m1>, ~cdi), ~m, 
+                                           sign(<'LEAF_EV', $L2, $A, $V, ~epoch, ~n, ~m>, ~cdi.1), m3, 
+                                           sign(<'LEAF_EV', $L3, $A, $V, ~epoch, ~n, m3>, ~cdi.2)>), 
+                                        h(<$L1, $L2, $L3>)>,
+                                       ~aik)
+                             ) @ #vk.44 )
+                        case Aggregator_Quote_Fixed
+                        by contradiction /* from formulas */
+                      next
+                        case c_sign
+                        solve( !KU( ~aik ) @ #vk.53 )
+                          case Reveal_LtkTPM
+                          by contradiction /* from formulas */
+                        qed
+                      qed
+                    qed
+                  qed
+                next
+                  case Leaf_Attest_case_3
+                  by contradiction /* from formulas */
+                next
+                  case c_sign
+                  solve( !KU( ~cdi.1 ) @ #vk.42 )
+                    case Compromise_LeafSw
+                    solve( !KU( sign(<'LEAF_EV', $L3, $A, $V, ~epoch, ~n, m3>, ~cdi.2)
+                           ) @ #vk.39 )
+                      case Leaf_Attest_case_1
+                      by contradiction /* from formulas */
+                    next
+                      case Leaf_Attest_case_2
+                      by contradiction /* from formulas */
+                    next
+                      case Leaf_Attest_case_3
+                      solve( !KU( sign(<'AGG_EV', $A, $V, ~epoch, ~n, 
+                                        h(<m1, sign(<'LEAF_EV', $L1, $A, $V, ~epoch, ~n, m1>, ~cdi), m2, 
+                                           sign(<'LEAF_EV', $L2, $A, $V, ~epoch, ~n, m2>, ~cdi.1), ~m, 
+                                           sign(<'LEAF_EV', $L3, $A, $V, ~epoch, ~n, ~m>, ~cdi.2)>), 
+                                        h(<$L1, $L2, $L3>)>,
+                                       ~aik)
+                             ) @ #vk.43 )
+                        case Aggregator_Quote_Fixed
+                        by contradiction /* from formulas */
+                      next
+                        case c_sign
+                        solve( !KU( ~aik ) @ #vk.53 )
+                          case Reveal_LtkTPM
+                          by contradiction /* from formulas */
+                        qed
+                      qed
+                    next
+                      case c_sign
+                      solve( !KU( ~cdi.2 ) @ #vk.49 )
+                        case Compromise_LeafSw
+                        solve( !KU( sign(<'AGG_EV', $A, $V, ~epoch, ~n, 
+                                          h(<m1, sign(<'LEAF_EV', $L1, $A, $V, ~epoch, ~n, m1>, ~cdi), m2, 
+                                             sign(<'LEAF_EV', $L2, $A, $V, ~epoch, ~n, m2>, ~cdi.1), m3, 
+                                             sign(<'LEAF_EV', $L3, $A, $V, ~epoch, ~n, m3>, ~cdi.2)>), 
+                                          h(<$L1, $L2, $L3>)>,
+                                         ~aik)
+                               ) @ #vk.47 )
+                          case Aggregator_Quote_Fixed
+                          by contradiction /* from formulas */
+                        next
+                          case c_sign
+                          solve( !KU( ~aik ) @ #vk.55 )
+                            case Reveal_LtkTPM
+                            by contradiction /* from formulas */
+                          qed
+                        qed
+                      qed
+                    qed
+                  qed
+                qed
+              qed
+            qed
+          qed
+        qed
+      qed
+    qed
+  qed
+qed
+
+/* All wellformedness checks were successful. */
+
+/*
+Generated from:
+Tamarin version 1.12.0
+Maude version 3.5.1
+Git revision: 82780bbaf3328a45f624ddb41e51bf75425f851c (with uncommited changes), branch: master
+Compiled at: 2026-03-07 14:22:39.174278293 UTC
+*/
+
+end

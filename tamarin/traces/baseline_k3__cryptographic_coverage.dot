@@ -1,0 +1,124 @@
+digraph "trace_HierarchicalCRA_Baseline_K3_SL2-AS0-CL0-A1-C1-NB_cryptographic_coverage-Verifier_StartSession-Register_AggrTPM-Publish_Membership_K3_case_1-Register_LeafDICE-Register_LeafDICE-Register_LeafDICE-Register_AggrTPM-Aggregator_Quote-TPM_respond-Verifier_StartSession-Verifier_StartSession-TEE_send-TEE_send-TPM_respond" {
+nodesep="0.3";
+ranksep="0.3";
+node[fontsize="8",fontname="Helvetica",width="0.3",height="0.2"];
+edge[fontsize="8",fontname="Helvetica"];
+n4[shape="record",label="{{<n0> !Session( $V, $A, ~n,\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;~epoch\l)\l|<n1> !PkTPM( $A, pk(~aik)\l)\l|<n2> In( \<AG1, $A, $V, ~epoch, evset, SI1\> )}|{<n3> #i : Verifier_AcceptAggregate[Eq( true, true ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Accept( $V, $A, ~epoch, evset ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AcceptedFrom( $V, $A, ~epoch, ~n )]\l}}",fillcolor="#d5d897",style="filled",fontcolor="black",role="Undefined"];
+n13[shape="record",label="{{<n5> !LtkLeaf( $L1, ~cdi )|<n6> !LtkLeaf( $L2, ~cdi.1 )|<n7> !LtkLeaf( $L3, ~cdi.2 )|<n8> !LtkTPM( $A, ~aik )}|{<n9> #j : Publish_Membership_K3[RosterDistinct( $L1, $L2 ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;RosterDistinct( $L1, $L3 ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;RosterDistinct( $L2, $L3 ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MemberOf( $L1, $A ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MemberOf( $L2, $A ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MemberOf( $L3, $A ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;OnlyOnceR( $A )]\l}|{<n10> !Member( $L1, $A )|<n11> !Member( $L2, $A )|<n12> !Member( $L3, $A )}}",fillcolor="#d1d897",style="filled",fontcolor="black",role="Undefined"];
+n14[label="#vf : isend",shape="ellipse"];
+n15[label="#vk : coerce[!KU( SI1 )]",shape="ellipse"];
+n16[label="#vl : irecv",shape="ellipse"];
+n22[shape="record",label="{{<n17> Fr( ~n )|<n18> Fr( ~epoch )}|{<n19> #vr : Verifier_StartSession[SessionStart( $V, $A, ~n, ~epoch ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;UniqueEpoch( ~epoch )]\l}|{<n20> Out( \<'CHAL', $V, $A, ~n, ~epoch\> )|<n21> !Session( $V, $A, ~n, ~epoch )}}",fillcolor="#cbd998",style="filled",fontcolor="black",role="Undefined"];
+n23[label="#vk.1 : coerce[!KU( SI2 )]",shape="ellipse"];
+n24[label="#vl.1 : irecv",shape="ellipse"];
+n30[shape="record",label="{{<n25> Fr( ~aik )}|{<n26> #vr.1 : Register_AggrTPM[EnrolledTPM( $A, ~aik ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;OnlyOnceT( $A )]\l}|{<n27> !LtkTPM( $A, ~aik )|<n28> !PkTPM( $A, pk(~aik) )|<n29> Out( pk(~aik) )}}",fillcolor="#c4da98",style="filled",fontcolor="black",role="Undefined"];
+n31[label="#vk.2 : coerce[!KU( ~epoch )]",shape="ellipse"];
+n32[label="#vl.2 : irecv",shape="ellipse"];
+n38[shape="record",label="{{<n33> Fr( ~cdi )}|{<n34> #vr.2 : Register_LeafDICE[EnrolledLeaf( $L1, ~cdi ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;OnlyOnceL( $L1 )]\l}|{<n35> !LtkLeaf( $L1, ~cdi )|<n36> !PkLeaf( $L1, pk(~cdi) )|<n37> Out( pk(~cdi) )}}",fillcolor="#b3db99",style="filled",fontcolor="black",role="Undefined"];
+n39[label="#vk.3 : coerce[!KU( ~n )]",shape="ellipse"];
+n40[label="#vl.3 : irecv",shape="ellipse"];
+n46[shape="record",label="{{<n41> Fr( ~cdi.1 )}|{<n42> #vr.3 : Register_LeafDICE[EnrolledLeaf( $L2, ~cdi.1 ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;OnlyOnceL( $L2 )]\l}|{<n43> !LtkLeaf( $L2, ~cdi.1 )|<n44> !PkLeaf( $L2, PK1 )|<n45> Out( PK1 )}}",fillcolor="#b3db99",style="filled",fontcolor="black",role="Undefined"];
+n47[label="#vk.4 : coerce[!KU( SI3 )]",shape="ellipse"];
+n53[shape="record",label="{{<n48> Fr( ~cdi.2 )}|{<n49> #vr.4 : Register_LeafDICE[EnrolledLeaf( $L3, ~cdi.2 ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;OnlyOnceL( $L3 )]\l}|{<n50> !LtkLeaf( $L3, ~cdi.2 )|<n51> !PkLeaf( $L3, PK2 )|<n52> Out( PK2 )}}",fillcolor="#b3db99",style="filled",fontcolor="black",role="Undefined"];
+n54[label="#vk.5 : coerce[!KU( 'g'^~ta )]",shape="ellipse"];
+n61[shape="record",label="{{<n55> !LtkTPM( $A, ~aik )|<n56> !TEETPMKey( $A, EX1\l)\l|<n57> In( \<'CHAL', $V, $A, ~n, ~epoch\> )|<n58> In( evset.1 )}|{<n59> #vr.5 : Aggregator_Quote[AggrQuoted( $A, $V, ~epoch, ~n, evset.1 ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;UsedKey( $A, EX1 )]\l}|{<n60> Out( \<AG1, $A, $V, ~epoch, evset.1, SI1\> )}}",fillcolor="#b0dc9a",style="filled",fontcolor="black",role="Undefined"];
+n62[label="#vk.6 : coerce[!KU( 'g'^~tb )]",shape="ellipse"];
+n63[label="#vr.6 : d_0_snd",shape="ellipse"];
+n64[label="#vf.7 : isend",shape="ellipse"];
+n65[label="#vr.7 : d_0_snd",shape="ellipse"];
+n66[label="#vf.8 : isend",shape="ellipse"];
+n67[label="#vr.8 : d_0_snd",shape="ellipse"];
+n68[label="#vf.9 : isend",shape="ellipse"];
+n69[label="#vr.9 : d_0_snd",shape="ellipse"];
+n70[label="#vr.10 : d_0_snd",shape="ellipse"];
+n75[shape="record",label="{{<n71> St_TEE( $A, ~ta, pk(~aik) )|<n72> In( \<$A, 'TPM_ACK', 'g'^~tb, SI2\> )}|{<n73> #vr.11 : TEE_finish[Eq( true, true ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AgreeTEE( $A, 'g'^~ta, 'g'^~tb ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Commit_TEE( $A, 'g'^~ta, 'g'^~tb ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SessionKey( $A, EX1 ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;SecretKey( EX1 )]\l}|{<n74> !TEETPMKey( $A, EX1 )}}",fillcolor="#acdc9a",style="filled",fontcolor="black",role="Undefined"];
+n76[label="#vf.12 : isend",shape="ellipse"];
+n83[shape="record",label="{{<n77> !LtkTEE( $A, ~tsk )|<n78> !PkTPM( $A, pk(~aik) )|<n79> Fr( ~ta )}|{<n80> #vr.12 : TEE_send[TEE_Started( $A, 'g'^~ta )]}|{<n81> Out( \<$A, TE1, 'g'^~ta, SI3\> )|<n82> St_TEE( $A, ~ta, pk(~aik) )}}",fillcolor="#a9dd9a",style="filled",fontcolor="black",role="Undefined"];
+n89[shape="record",label="{{<n84> Fr( ~tsk )}|{<n85> #vr.13 : Register_AggrTEE[EnrolledTEE( $A, ~tsk ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;OnlyOnceE( $A )]\l}|{<n86> !LtkTEE( $A, ~tsk )|<n87> !PkTEE( $A, pk(~tsk) )|<n88> Out( pk(~tsk) )}}",fillcolor="#a5dd9a",style="filled",fontcolor="black",role="Undefined"];
+n97[shape="record",label="{{<n90> !LtkTPM( $A, ~aik )|<n91> !PkTEE( $A, pk(~tsk) )|<n92> In( \<$A, TE1, 'g'^~ta, SI3\> )|<n93> Fr( ~tb )}|{<n94> #vr.14 : TPM_respond[Eq( true, true ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;AgreeTPM( $A, 'g'^~ta, 'g'^~tb ),\l&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Running_TPM( $A, 'g'^~ta, 'g'^~tb )]\l}|{<n95> Out( \<$A, 'TPM_ACK', 'g'^~tb, SI2\> )|<n96> St_TPM( $A, ~tb, 'g'^~ta )}}",fillcolor="#a2dd9b",style="filled",fontcolor="black",role="Undefined"];
+n98[label="#vr.15 : d_0_snd",shape="ellipse"];
+n99[label="#vr.16 : d_0_snd",shape="ellipse"];
+n100[label="#vr.18 : d_0_snd",shape="ellipse"];
+n101[label="#vr.19 : d_0_snd",shape="ellipse"];
+n102[label="#vr.20 : d_0_snd",shape="ellipse"];
+n103[label="#vr.23 : d_0_snd",shape="ellipse"];
+n104[label="#vr.24 : d_0_snd",shape="ellipse"];
+n105[label="!KU( evset ) @ #vk.25",shape="ellipse",color="gray"];
+n106[label="!KU( evset.1 ) @ #vk.27",shape="ellipse",color="gray"];
+n14 -> n4:n2[color="gray30"];
+n16 -> n63[color="orangered2"];
+n22:n20 -> n32[color="gray30"];
+n22:n21 -> n4:n0[style="bold",weight="10.0",color="gray50"];
+n24 -> n98[color="orangered2"];
+n30:n27 -> n13:n8[style="bold",weight="10.0",color="gray50"];
+n30:n27 -> n61:n55[style="bold",weight="10.0",color="gray50"];
+n30:n27 -> n97:n90[style="bold",weight="10.0",color="gray50"];
+n30:n28 -> n4:n1[style="bold",weight="10.0",color="gray50"];
+n30:n28 -> n83:n78[style="bold",weight="10.0",color="gray50"];
+n32 -> n100[color="orangered2"];
+n38:n35 -> n13:n5[style="bold",weight="10.0",color="gray50"];
+n40 -> n103[color="orangered2"];
+n46:n43 -> n13:n6[style="bold",weight="10.0",color="gray50"];
+n53:n50 -> n13:n7[style="bold",weight="10.0",color="gray50"];
+n61:n60 -> n16[color="gray30"];
+n63 -> n65[color="orangered2"];
+n64 -> n61:n57[color="gray30"];
+n65 -> n67[color="orangered2"];
+n66 -> n61:n58[color="gray30"];
+n67 -> n69[color="orangered2"];
+n68 -> n75:n72[color="gray30"];
+n69 -> n70[color="orangered2"];
+n70 -> n15[color="orangered2"];
+n75:n74 -> n61:n56[style="bold",weight="10.0",color="gray50"];
+n76 -> n97:n92[color="gray30"];
+n83:n81 -> n40[color="gray30"];
+n83:n82 -> n75:n71[style="bold",weight="10.0"];
+n89:n86 -> n83:n77[style="bold",weight="10.0",color="gray50"];
+n89:n87 -> n97:n91[style="bold",weight="10.0",color="gray50"];
+n97:n95 -> n24[color="gray30"];
+n98 -> n99[color="orangered2"];
+n99 -> n23[color="orangered2"];
+n99 -> n62[color="orangered2"];
+n100 -> n101[color="orangered2"];
+n101 -> n102[color="orangered2"];
+n102 -> n31[color="orangered2"];
+n102 -> n39[color="orangered2"];
+n103 -> n104[color="orangered2"];
+n104 -> n47[color="orangered2"];
+n104 -> n54[color="orangered2"];
+n13:n9 -> n4:n3[color="black",style="dashed"];
+n15 -> n14[color="red",style="dashed"];
+n23 -> n68[color="red",style="dashed"];
+n24 -> n68[color="red",style="dashed"];
+n31 -> n14[color="red",style="dashed"];
+n31 -> n64[color="red",style="dashed"];
+n32 -> n64[color="red",style="dashed"];
+n39 -> n64[color="red",style="dashed"];
+n40 -> n76[color="red",style="dashed"];
+n47 -> n76[color="red",style="dashed"];
+n54 -> n76[color="red",style="dashed"];
+n62 -> n68[color="red",style="dashed"];
+n98 -> n68[color="red",style="dashed"];
+n99 -> n68[color="red",style="dashed"];
+n100 -> n64[color="red",style="dashed"];
+n101 -> n64[color="red",style="dashed"];
+n102 -> n64[color="red",style="dashed"];
+n103 -> n76[color="red",style="dashed"];
+n104 -> n76[color="red",style="dashed"];
+n105 -> n14[color="red",style="dashed"];
+n106 -> n66[color="red",style="dashed"];
+{
+rank="sink";
+n107[shape="plain",label=<<TABLE BORDER="1" CELLBORDER="0" CELLSPACING="3" CELLPADDING="1"><TR><TD ALIGN="LEFT" VALIGN="TOP"><FONT COLOR="#000000">AG1</FONT></TD> <TD ALIGN="LEFT" VALIGN="TOP">=</TD> <TD ALIGN="LEFT" VALIGN="TOP">'AGG_REPORT'</TD></TR>
+                                                                 <TR><TD ALIGN="LEFT" VALIGN="TOP"><FONT COLOR="#000000">EX1</FONT></TD> <TD ALIGN="LEFT" VALIGN="TOP">=</TD> <TD ALIGN="LEFT" VALIGN="TOP">'g'^(~ta*~tb)</TD></TR>
+                                                                 <TR><TD ALIGN="LEFT" VALIGN="TOP"><FONT COLOR="#000000">PK1</FONT></TD> <TD ALIGN="LEFT" VALIGN="TOP">=</TD> <TD ALIGN="LEFT" VALIGN="TOP">pk(~cdi.1)</TD></TR>
+                                                                 <TR><TD ALIGN="LEFT" VALIGN="TOP"><FONT COLOR="#000000">PK2</FONT></TD> <TD ALIGN="LEFT" VALIGN="TOP">=</TD> <TD ALIGN="LEFT" VALIGN="TOP">pk(~cdi.2)</TD></TR>
+                                                                 <TR><TD ALIGN="LEFT" VALIGN="TOP"><FONT COLOR="#000000">SI1</FONT></TD> <TD ALIGN="LEFT" VALIGN="TOP">=</TD> <TD ALIGN="LEFT" VALIGN="TOP">sign(&lt;'AGG_EV', $A, $V, ~epoch, ~n&gt;, ~aik)</TD></TR>
+                                                                 <TR><TD ALIGN="LEFT" VALIGN="TOP"><FONT COLOR="#000000">SI2</FONT></TD> <TD ALIGN="LEFT" VALIGN="TOP">=</TD> <TD ALIGN="LEFT" VALIGN="TOP">sign(&lt;'TPM', $A, 'g'^~ta, 'g'^~tb&gt;, ~aik)</TD></TR>
+                                                                 <TR><TD ALIGN="LEFT" VALIGN="TOP"><FONT COLOR="#000000">SI3</FONT></TD> <TD ALIGN="LEFT" VALIGN="TOP">=</TD> <TD ALIGN="LEFT" VALIGN="TOP">sign(&lt;'TEE', $A, 'g'^~ta&gt;, ~tsk)</TD></TR>
+                                                                 <TR><TD ALIGN="LEFT" VALIGN="TOP"><FONT COLOR="#000000">TE1</FONT></TD> <TD ALIGN="LEFT" VALIGN="TOP">=</TD> <TD ALIGN="LEFT" VALIGN="TOP">'TEE_HELLO'</TD></TR></TABLE>>];
+
+}
+n4:n3 -> n107[style="invis"];
+
+}

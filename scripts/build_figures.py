@@ -1,29 +1,28 @@
 """
-Regenerate the paper's figures under an LNCS-friendly Matplotlib style.
+Regenerate the plotted figures of the paper in an LNCS-friendly Matplotlib style.
 
-Why this exists
----------------
-Earlier revisions of the figures embedded fonts that appeared as
-"font mismatch" warnings under pdftoppm/xpdf and rendered a few
-math tokens with a fallback CJK glyph set on hosts where DejaVu
-Serif was not installed.  This script pins the whole visual style
-to what Springer LNCS/LNNS proceedings use:
+Earlier revisions of the figures embedded fonts that pdftoppm/xpdf
+reported as "font mismatch" and rendered a few math tokens with a
+fallback CJK glyph set on hosts without DejaVu Serif.  This script pins
+the visual style to Springer LNCS/LNNS proceedings:
 
-  * Serif body font (Computer Modern via matplotlib's mathtext),
-    so figures match the paper's body text at print size.
-  * Type-3 PostScript fonts (pdf.fonttype=3), which are the default
-    for LNCS-compatible submissions and never trigger the "TrueType
-    embedded but declared Type-1" warning that the previous PDFs
-    tripped.
-  * No Unicode symbols in labels; every character is Latin-1.
-  * Line widths and marker sizes tuned so the shrunk figure (about
-    9 cm wide in svproc) still reads at 100 % zoom.
+  * a serif body font (Computer Modern via Matplotlib's mathtext), so
+    the figures match the paper's body text at print size;
+  * fully embedded Type-3 fonts (pdf.fonttype=3, Matplotlib's default),
+    which avoid the "TrueType embedded but declared Type-1" warning of
+    the earlier PDFs;
+  * Latin-1 characters only in every label;
+  * line widths and marker sizes that keep the shrunk figure (about
+    9 cm wide in svproc) legible at 100% zoom.
 
-Files produced
---------------
-    paper/figures/fig_scalability.pdf     Fig. 4 in the paper
-    paper/figures/fig_ftpm_hist.pdf       kept for the artefact
-    paper/figures/fig_env_comparison.pdf  kept for the artefact
+The script reads the CSV files under prototype/results/ and writes
+
+    figures/fig_scalability.pdf     Fig. 4 of the paper
+    figures/fig_ftpm_hist.pdf       supplementary plot
+    figures/fig_env_comparison.pdf  supplementary plot
+
+Run from any directory:
+    python3 scripts/build_figures.py
 """
 from __future__ import annotations
 
@@ -79,13 +78,14 @@ plt.rcParams.update({
     "legend.edgecolor":    "black",
 })
 
-ROOT = Path("/home/user/workspace/bce27")
+ROOT = Path(__file__).resolve().parents[1]       # repository root
 FIG  = ROOT / "figures"
+RES  = ROOT / "prototype" / "results"
 
-SB_MOCK  = ROOT / "prototype" / "results"       / "e5_scalability_mock.csv"
-WSL_MOCK = ROOT / "prototype" / "results_wsl2"  / "e5_scalability_mock.csv"
-WSL_SWT  = ROOT / "prototype" / "results_wsl2"  / "e5_scalability_swtpm.csv"
-FTPM_CSV = ROOT / "prototype" / "results_ftpm"  / "ftpm_quote_latency.csv"
+SB_MOCK  = RES / "sandbox" / "e5_scalability_mock.csv"
+WSL_MOCK = RES / "wsl2"    / "e5_scalability_mock.csv"
+WSL_SWT  = RES / "wsl2"    / "e5_scalability_swtpm.csv"
+FTPM_CSV = RES / "ftpm"    / "ftpm_quote_latency.csv"
 
 
 def read_sweep(path):
@@ -107,7 +107,7 @@ def fig_scalability():
 
     common = dict(linewidth=1.1, markersize=4.5, markeredgewidth=0.8)
 
-    # ---- panel (a): Verifier latency vs k ----
+    # Panel (a): Verifier latency vs k
     axL.plot(ks_sb, vr_sb, marker="o", linestyle="--",
              color="black",         label="mock, sandbox", **common)
     axL.plot(ks_wm, vr_wm, marker="s", linestyle="-",
@@ -130,7 +130,7 @@ def fig_scalability():
     axL.text(1050, 240, "fTPM Quote 194.5 ms", ha="right",
              fontsize=6.3, alpha=0.80)
 
-    # ---- panel (b): Aggregator latency vs k ----
+    # Panel (b): Aggregator latency vs k
     axR.plot(ks_sb, ag_sb, marker="o", linestyle="--",
              color="black",         label="mock, sandbox", **common)
     axR.plot(ks_wm, ag_wm, marker="s", linestyle="-",
@@ -223,6 +223,7 @@ def fig_env_comparison():
 
 
 if __name__ == "__main__":
+    FIG.mkdir(parents=True, exist_ok=True)
     fig_scalability()
     fig_ftpm_hist()
     fig_env_comparison()

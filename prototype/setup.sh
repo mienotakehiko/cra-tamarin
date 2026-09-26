@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================================
 #  setup.sh
-#  Companion prototype -- environment bootstrap.
+#  Environment bootstrap for the companion prototype.
 #
 #  Idempotent, safe to run multiple times.  Exits 0 on full success.
 #  Verified on Ubuntu 24.04 LTS with:
@@ -17,11 +17,10 @@
 #        prototype/crypto.py + prototype/tpm_swtpm.py
 #      * PROTO_TPM_MODE=mock (default) skips the swtpm daemon entirely
 #
-#  This script does NOT rely on tpm2-pytss.  It uses tpm2-tools via
-#  subprocess because its CLI is more stable across Ubuntu versions.
-#  tpm2-pytss remains a Python dependency ONLY as a convenience for
-#  users who want to write their own experiments; the shipped
-#  prototype does not import it.
+#  This script does NOT rely on tpm2-pytss.  The prototype calls
+#  tpm2-tools via subprocess because its CLI is more stable across
+#  Ubuntu versions; neither the shipped code nor requirements.lock
+#  depends on tpm2-pytss.
 # ============================================================================
 set -euo pipefail
 
@@ -29,14 +28,14 @@ log()   { printf '\033[1;34m[setup]\033[0m %s\n' "$*"; }
 warn()  { printf '\033[1;33m[warn ]\033[0m %s\n' "$*"; }
 err()   { printf '\033[1;31m[error]\033[0m %s\n' "$*" >&2; }
 
-# ---- 1. sanity ------------------------------------------------------------
+# 1. Sanity check
 if [[ ! -r /etc/os-release ]]; then
     err "cannot read /etc/os-release"; exit 1
 fi
 . /etc/os-release
 log "OS: ${PRETTY_NAME:-unknown}"
 
-# ---- 2. apt packages -------------------------------------------------------
+# 2. apt packages
 log "installing apt packages (may prompt for sudo)"
 export DEBIAN_FRONTEND=noninteractive
 sudo apt-get update -qq
@@ -49,7 +48,7 @@ sudo apt-get install -y --no-install-recommends \
     graphviz \
     >/dev/null
 
-# ---- 3. python venv --------------------------------------------------------
+# 3. Python venv
 VENV="${VENV:-$HOME/.venvs/bce27}"
 if [[ ! -d "$VENV" ]]; then
     log "creating python venv at $VENV"
@@ -75,9 +74,10 @@ else
         "numpy>=1.26"
 fi
 
-# ---- 4. Start swtpm ----------------------------------------------------
-# swtpm is started in a way that survives shell exit even on
-# minimal-init containers (e.g. Docker or tini-based sandboxes).
+# 4. Start swtpm
+# setsid + nohup keep swtpm alive after the shell exits, even on
+# minimal-init containers (e.g. Docker or tini-based sandboxes), where
+# the vendor-supplied --daemon flag stalls.
 TPM_DIR="${TPM_DIR:-/tmp/mytpm0}"
 log "provisioning swtpm at $TPM_DIR"
 
@@ -114,37 +114,39 @@ if [[ ! -S "$TPM_DIR/swtpm-sock" ]]; then
 fi
 log "swtpm running (socket = $TPM_DIR/swtpm-sock)"
 
-# ---- 5. Smoke test via tpm2-tools -----------------------------------------
+# 5. Smoke test via tpm2-tools
 export TPM2TOOLS_TCTI="swtpm:path=$TPM_DIR/swtpm-sock"
 log "TPM 2.0 spec probe:"
 tpm2_getcap properties-fixed | grep -E "TPM2_PT_FAMILY|TPM2_PT_REVISION|TPM2_PT_MANUFACTURER" | head -5
 
-# ---- 6. Python smoke test  (mock mode has no external deps) ---------------
+# 6. Python smoke test (mock mode has no external dependencies)
 log "python-level smoke test (mock mode)"
 python3 - <<'PY'
 import sys
 sys.path.insert(0, '.')
 try:
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-    import nacl.public
+    Ed25519PrivateKey.generate().sign(b"setup")
     print(" cryptography OK, Ed25519 works")
+    import nacl.public
+    nacl.public.PrivateKey.generate()
     print(" pynacl OK, X25519 works")
-    print(" numpy OK")
     import numpy
-    print(" matplotlib OK")
+    print(" numpy OK")
     import matplotlib
+    print(" matplotlib OK")
 except ImportError as e:
     print(" import failed:", e)
     sys.exit(1)
 PY
 
-# ---- 7. Optional python-level swtpm test ----------------------------------
-if [[ -d "prototype/prototype" ]]; then
+# 7. Optional Python-level swtpm test
+if [[ -f "prototype/crypto.py" ]]; then
     log "python-level swtpm test (real TPM2_Quote round trip)"
-    # NOTE: this script is expected to be run from the tarball's
-    # top-level 'prototype' directory (which contains the inner
-    # importable 'prototype/' package plus README/setup.sh).  The script does
-    # NOT cd into a subdirectory here.
+    # NOTE: run this script from the repository's top-level 'prototype'
+    # directory, which contains README.md, setup.sh and the inner
+    # importable 'prototype/' package.  The script does NOT cd into a
+    # subdirectory here.
     (
         PROTO_TPM_MODE=swtpm SWTPM_SOCKET="$TPM_DIR/swtpm-sock" PYTHONPATH=. \
             python3 -c "
@@ -159,7 +161,7 @@ print(' TPM2_Quote round trip: OK  ({} B signature blob)'.format(len(sig)))
     ) || warn "swtpm python smoke test failed (mock mode still works)"
 fi
 
-# ---- 8. Print activation hints -------------------------------------------
+# 8. Print activation hints
 cat <<HINT
 
 setup.sh finished successfully.
@@ -168,8 +170,8 @@ To activate the venv:
 
     source $VENV/bin/activate
 
-All commands below run from the current directory (the tarball's
-top-level 'prototype/', which contains README.md, setup.sh, and the
+All commands below run from the current directory (the repository's
+top-level 'prototype/', which contains README.md, setup.sh and the
 inner Python package also called 'prototype/').  Do NOT cd into a
 subdirectory.
 

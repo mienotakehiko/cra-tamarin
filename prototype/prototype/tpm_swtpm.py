@@ -2,42 +2,40 @@
 prototype/tpm_swtpm.py
 =======================
 
-Real swtpm-backed implementation of the AIK.  Uses tpm2-tools via
-subprocess (rather than tpm2-pytss) because the tpm2-tools CLI has a
-stable, well-documented interface across Ubuntu 24.04 / 22.04 versions,
+Real swtpm-backed implementation of the AIK.  The module drives
+tpm2-tools through subprocess rather than tpm2-pytss: the tpm2-tools CLI
+offers a stable, well-documented interface on Ubuntu 22.04 and 24.04,
 whereas the tpm2-pytss Python API has changed between recent releases.
 
-Design in three parts:
+The design has three parts.
 
-    1. TpmSwtpmContext  -- spawns and manages a swtpm daemon,
-                           creates a primary key and a restricted
-                           signing AK, and exposes a small "quote
-                           this qualifyingData" method.  Cleans up
-                           on __exit__.
+    1. TpmSwtpmContext   spawns and manages a swtpm daemon, creates a
+                         primary key and a restricted signing AK, and
+                         exposes a small "quote this qualifyingData"
+                         method.  __exit__ cleans up.
 
-    2. SwtpmAikKey      -- object attached to an aggregator; delegates
-                           sign(payload) to context.quote(payload).
-                           The signature that comes back is the raw TPM
-                           RSA-SSA signature over the TPM2_ATTEST
-                           structure; the verifier reconstructs the
-                           attestation structure and checks it.
+    2. SwtpmAikKey       is attached to an aggregator and delegates
+                         sign(payload) to the context's quote().  The
+                         returned blob carries the TPM2_ATTEST structure
+                         and the AK's RSA-SSA signature over it, so the
+                         verifier can parse and check both.
 
-    3. verify_tpm_quote_signature -- helper on the verifier side that
-                           parses the TPM2_ATTEST structure, extracts
-                           the extraData (== qualifyingData), and
-                           checks the RSA-SSA/SHA-256 signature against
-                           the AK public key.
+    3. verify_aik_swtpm  is the verifier-side helper.  It parses the
+                         TPM2_ATTEST structure, extracts extraData
+                         (== qualifyingData), and checks the
+                         RSA-SSA/SHA-256 signature against the AK
+                         public key.
 
-Notes on scheme choice:
-    The backend uses  rsa2048:rsassa-sha256 (RSA-PKCS1-v1.5-like) rather than
-    RSA-PSS because rsapss on restricted signing keys is fragile in
-    the tpm2-tools 5.6 shipped with Ubuntu 24.04 (Esys returns 0x2D2
-    "unsupported or incompatible scheme").  This is a *scheme* change,
-    not a *primitive* change: the Tamarin abstract algebra models
-    every AIK signature as sign(payload, aik) with a free-term
-    signing constructor, so the choice of RSASSA vs. RSAPSS is
-    invisible at the proof level.  The paper's threat model does not
-    depend on message-recovery or PSS-specific properties.
+Scheme choice:
+    The backend uses rsa2048:rsassa-sha256 (PKCS#1 v1.5) rather than
+    RSA-PSS, because rsapss on a restricted signing key fails with the
+    tpm2-tools 5.6 shipped in Ubuntu 24.04 (Esys returns 0x2D2,
+    "unsupported or incompatible scheme").  The change affects the
+    padding *scheme*, not the *primitive*: the Tamarin algebra models
+    every AIK signature as sign(payload, aik) with a free-term signing
+    constructor, so RSASSA and RSAPSS are indistinguishable at the proof
+    level, and the threat model relies on no message-recovery or
+    PSS-specific property.
 """
 from __future__ import annotations
 
@@ -89,12 +87,11 @@ class TpmSwtpmContext:
     Typical usage:
 
         with TpmSwtpmContext() as ctx:
-            aik = SwtpmAikKey.from_context(ctx)
-            sig = aik.sign(some_payload)          # <-- real TPM2_Quote
+            aik = SwtpmAikKey(ctx)
+            sig = aik.sign(some_payload)          # real TPM2_Quote
 
-    The context object holds the AK's context file, the AK's public
-    modulus (extracted once at setup), and a lock to serialise Quote
-    calls (TPMs are single-threaded).
+    The context holds the AK's context file and the AK's public key,
+    which it exports once at setup.
     """
 
     tpm_dir: Path = field(default_factory=lambda: Path(
@@ -106,7 +103,6 @@ class TpmSwtpmContext:
     _ak_pub_pem: Optional[bytes] = None
     _closed: bool = False
 
-    # --------------------------------------------------------------
     def __enter__(self):
         self.start()
         return self
@@ -114,7 +110,6 @@ class TpmSwtpmContext:
     def __exit__(self, exc_type, exc, tb):
         self.stop()
 
-    # --------------------------------------------------------------
     def start(self):
         """Start a swtpm or attach to a pre-existing one.
 
@@ -179,7 +174,6 @@ class TpmSwtpmContext:
         atexit.register(self._silent_stop)
         self._provision_ak()
 
-    # --------------------------------------------------------------
     def _provision_ak(self):
         """Create a primary key, then a restricted RSA-SSA/SHA-256 AK.
 
@@ -247,12 +241,10 @@ class TpmSwtpmContext:
         self._ak_ctx_path = ak_reload
         self._ak_pub_pem = ak_pem.read_bytes()
 
-    # --------------------------------------------------------------
     def ak_public_pem(self) -> bytes:
         assert self._ak_pub_pem is not None, "context not started"
         return self._ak_pub_pem
 
-    # --------------------------------------------------------------
     def quote(self, qualifying_data: bytes) -> tuple[bytes, bytes, bytes]:
         """Run TPM2_Quote with the given qualifyingData.
 
@@ -293,12 +285,10 @@ class TpmSwtpmContext:
             _run_tpm2(["tpm2_flushcontext", "-t"], self._tcti)
             return msg.read_bytes(), sig.read_bytes(), pcrs.read_bytes()
 
-    # --------------------------------------------------------------
     @property
     def tcti(self) -> str:
         return self._tcti
 
-    # --------------------------------------------------------------
     def stop(self):
         self._silent_stop()
 
@@ -317,7 +307,7 @@ class TpmSwtpmContext:
 
 
 # ============================================================================
-#  SwtpmAikKey  -- object with a sign() method matching the mock AikKey
+#  SwtpmAikKey: sign() interface matching the mock AikKey
 # ============================================================================
 
 
@@ -345,7 +335,6 @@ class SwtpmAikKey:
             serialization.PublicFormat.SubjectPublicKeyInfo,
         )
 
-    # --------------------------------------------------------------
     def sign(self, payload: bytes) -> bytes:
         """The 'signature' in swtpm mode is the concatenation
              len(attest) || attest || sig
@@ -376,8 +365,8 @@ def verify_aik_swtpm(pk_bytes: bytes, payload: bytes, sig_blob: bytes) -> bool:
         4. Verify the RSA-SSA/SHA-256 signature over SHA-256(attest_blob)
            against pk_bytes.
 
-    Step 3 is the D2 anchor -- it is what binds the AIK signature to
-    the extended application payload.
+    Step 3 is the D2 anchor: it binds the AIK signature to the extended
+    application payload.
     Step 4 is the standard TPM attestation-signature check.
     """
     try:

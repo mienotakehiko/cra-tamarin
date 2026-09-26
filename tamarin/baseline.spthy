@@ -1,29 +1,34 @@
 /*
  * ============================================================================
  *  baseline.spthy
- *  Submission -- companion artifact (1/2)
+ *  cra-tamarin companion artefact v1.1: baseline design (paper Sections 4, 5, 7)
  *
- *  Title    : Formal Analysis of Hierarchical Collective Remote Attestation
- *             with Heterogeneous TPM/DICE Roots of Trust in Tamarin
- *  Target   : IETF RATS (RFC 9334) Passport-model Composite Attester
- *             specialised to a two-level hierarchy:
- *                 Verifier --  Aggregator (TPM 2.0 + TEE)  --  Leaf (DICE)
+ *  Paper    : Formal Analysis of Hierarchical Collective Remote Attestation
+ *             with Heterogeneous TPM/DICE Roots of Trust in Tamarin Prover
+ *             (T. Mieno, BCE'27, Springer LNNS)
  *
- *  Version  : baseline (intentionally weak on coverage-binding).
- *             The companion hardened model is `fixed.spthy`.
+ *  Baseline design following the RATS Composite-Attester pattern.  The TPM
+ *  Quote payload p_base = <'AGG_EV', A, V, epoch, n> carries the child-evidence
+ *  set without binding it, and Accept fires independently of the per-leaf
+ *  Verifier_ParseEntry rule.  Publish_Membership registers roster members one
+ *  leaf at a time.
  *
- *  Verified with tamarin-prover 1.12.0 + maude 3.2.
+ *  Lemmas (identical text in every theory of the artefact):
+ *    executability          exists-trace  sanity: an honest run reaches Accept
+ *    key_secrecy            all-traces    TEE-TPM DH key secrecy
+ *    injective_agree_TEE    all-traces    TEE's injective agreement with TPM
+ *    freshness              all-traces    accepted report answers V's challenge
+ *    report_integrity       all-traces    per-leaf integrity of AcceptEntry
+ *    cryptographic_coverage all-traces    no honest roster leaf silently omitted
+ *    aggregate_binding      all-traces    accepted evidence = evidence the AIK
+ *                                         holder Quoted (added in v1.1)
  *
- *  Verified properties (all-traces unless noted):
- *      executability        [exists-trace]  proved
- *      key_secrecy                          proved
- *      injective_agree_TEE                  proved
- *      injective_agree_TPM                  proved
- *      freshness                            proved
- *      report_integrity                     proved
- *      cryptographic_coverage               FALSIFIED (attack trace)
+ *  Expected: the first five lemmas verified; cryptographic_coverage FALSIFIED
+ *  (13-step silent-omission trace, paper Fig. 3); aggregate_binding FALSIFIED
+ *  (the evidence set is not under the AIK signature).
  *
- *  The last lemma is the driver for the hardened protocol.
+ *  Toolchain: tamarin-prover 1.12.0; cross-checked with maude 3.2 and 3.5.1.
+ *  Expected results: see expected/baseline.txt
  * ============================================================================
  */
 
@@ -34,13 +39,13 @@ begin
 builtins:
     signing, hashing, diffie-hellman
 
-/* ---------------------------------------------------------------------------
+/* ===========================================================================
  *  Abstracted primitives
- *  ------------------------------------------------------------------------
- *  The theories rely on the built-in `sign/verify` and `h/1`; no extra function
- *  symbols are required.  Messages are tagged by string constants ('LEAF_EV', 'AGG_EV',
- *  ...) to keep the different signature contexts disjoint.
- * ------------------------------------------------------------------------- */
+ *
+ *  The theories rely on the built-in sign/verify and h/1 and need no extra
+ *  function symbols.  String tags ('LEAF_EV', 'AGG_EV', ...) keep the
+ *  different signature contexts disjoint.
+ * =========================================================================== */
 
 
 /* ===========================================================================
@@ -51,7 +56,7 @@ builtins:
  *    - AIK on every aggregator's TPM      (long-term secret aik)
  *    - TSK on every aggregator's TEE      (long-term secret tsk)
  *
- *  Uniqueness of enrollment is enforced by restrictions.
+ *  Restrictions enforce unique enrollment.
  * =========================================================================== */
 
 rule Register_LeafDICE:
@@ -69,8 +74,9 @@ rule Register_AggrTEE:
   --[ EnrolledTEE($A, ~tsk), OnlyOnceE($A) ]->
     [ !LtkTEE($A, ~tsk), !PkTEE($A, pk(~tsk)), Out(pk(~tsk)) ]
 
-/* Enrollment authority publishes membership of leaf L in aggregator A.
- * Persistent fact; action Member is recorded for use in the coverage lemma. */
+/* The Enrollment Authority publishes the membership of leaf L in aggregator
+ * A.  The persistent fact !Member feeds the protocol rules, and the action
+ * MemberOf feeds the coverage lemma.                                       */
 rule Publish_Membership:
     [ !LtkLeaf($L, cdi), !LtkTPM($A, aik) ]
   --[ MemberOf($L, $A) ]->
@@ -94,39 +100,39 @@ rule Verifier_StartSession:
  *  Both endpoints sign a transcript that includes:
  *      role ('TEE' / 'TPM'), aggregator id, their own ephemeral share,
  *      and (for TPM) the peer's share.
- *  Both signatures are then bound so that a shared key g^(a*b) is agreed.
+ *  Binding both signatures lets the two sides agree on g^(ta*tb).
  *
- *  NOTE (baseline): the transcript does NOT include the current epoch nor
- *  the challenge nonce.  A cross-session TEE reuse would be conceivable
- *  in more elaborate threat models; here the model keeps this simple and lets the
- *  falsification arise elsewhere (coverage).
+ *  NOTE (baseline): the transcript includes neither the current epoch nor
+ *  the challenge nonce.  Cross-session reuse of a TEE key would be
+ *  conceivable in richer threat models; this model keeps the handshake
+ *  simple, and the falsification arises elsewhere (coverage).
  * =========================================================================== */
 
 rule TEE_send:
-    [ !LtkTEE($A, tsk), !PkTPM($A, pkTpm), Fr(~a) ]
-  --[ TEE_Started($A, 'g'^~a) ]->
-    [ Out(< $A, 'TEE_HELLO', 'g'^~a,
-            sign(<'TEE', $A, 'g'^~a>, tsk) >),
-      St_TEE($A, ~a, pkTpm) ]
+    [ !LtkTEE($A, tsk), !PkTPM($A, pkTpm), Fr(~ta) ]
+  --[ TEE_Started($A, 'g'^~ta) ]->
+    [ Out(< $A, 'TEE_HELLO', 'g'^~ta,
+            sign(<'TEE', $A, 'g'^~ta>, tsk) >),
+      St_TEE($A, ~ta, pkTpm) ]
 
 rule TPM_respond:
     let ga = ga_in
-        gb = 'g'^~b
+        gb = 'g'^~tb
     in
     [ !LtkTPM($A, aik), !PkTEE($A, pkTee),
       In(< $A, 'TEE_HELLO', ga_in, sig_tee >),
-      Fr(~b) ]
+      Fr(~tb) ]
   --[ Eq(verify(sig_tee, <'TEE', $A, ga_in>, pkTee), true),
       AgreeTPM($A, ga, gb),
       Running_TPM($A, ga, gb) ]->
     [ Out(< $A, 'TPM_ACK', gb, sign(<'TPM', $A, ga, gb>, aik) >),
-      St_TPM($A, ~b, ga) ]
+      St_TPM($A, ~tb, ga) ]
 
 rule TEE_finish:
-    let ga = 'g'^~a
-        k  = gb_in^~a
+    let ga = 'g'^~ta
+        k  = gb_in^~ta
     in
-    [ St_TEE($A, ~a, pkTpm),
+    [ St_TEE($A, ~ta, pkTpm),
       In(< $A, 'TPM_ACK', gb_in, sig_tpm >) ]
   --[ Eq(verify(sig_tpm, <'TPM', $A, ga, gb_in>, pkTpm), true),
       AgreeTEE($A, ga, gb_in),
@@ -152,27 +158,24 @@ rule Leaf_Attest:
 
 /* ===========================================================================
  *  5. Aggregator: collect leaf evidence, ask TPM to Quote
- * ===========================================================================
- *  BASELINE weakness (deliberate).
- *  --------------------------------
- *  The TPM Quote payload here is
+ *
+ *  BASELINE weakness (deliberate).  The TPM Quote payload here is
  *
  *      <'AGG_EV', A, V, epoch, n>
  *
  *  and does NOT commit to
- *      (a) the hash of the child-evidence-set actually forwarded, nor
+ *      (a) the hash of the child-evidence set actually forwarded, nor
  *      (b) the hash of the expected roster.
  *
- *  This lets a Dolev-Yao adversary silently drop a leaf's LEAF_EV from
+ *  A Dolev-Yao adversary can therefore silently drop a leaf's LEAF_EV from
  *  the network before the aggregator sees it: the aggregator still
  *  produces a valid Quote for the (V, epoch, n) triple, and the verifier
- *  cannot tell the leaf's evidence is missing.
+ *  cannot tell that the leaf's evidence is missing.
  *
- *  The rule "Aggregator_Quote" produces the Quote regardless of the
- *  child-evidence set.  The rule records the packed evidence set in an action
- *  ForwardedEvSet so that lemmas can talk about which leaves the
- *  aggregator saw.
- * --------------------------------------------------------------------------- */
+ *  Rule Aggregator_Quote produces the Quote regardless of the
+ *  child-evidence set and records that set in the action AggrQuoted, so
+ *  that lemmas can refer to the evidence the aggregator forwarded.
+ * =========================================================================== */
 
 rule Aggregator_Quote:
     [ !LtkTPM($A, aik),
@@ -252,29 +255,22 @@ restriction Unique_Epoch:
 
 
 /* ===========================================================================
- *  9. Sources lemma
+ *  9. Sources lemma (not needed)
  *
- *  For each origin of a leaf-attestation signature the model tells Tamarin either
- *  the leaf produced it honestly (LeafAttested action recorded), or the
- *  adversary knew the CDI beforehand (a KU-fact chain).  This resolves the
- *  partial deconstructions triggered by Verifier_ParseEntry pattern-matching
- *  on sign(...) directly out of the network.
+ *  The model needs no [sources] lemma.  Verifier_ParseEntry checks each
+ *  leaf signature through the verify() equality restriction instead of
+ *  pattern-matching on sign(...), so Tamarin's built-in Dolev-Yao solver
+ *  traces every AcceptEntry back to either an honest LeafAttested or an
+ *  adversary-known CDI and resolves all partial deconstructions
+ *  automatically.
  * =========================================================================== */
-
-/* Sources lemma is not required in this model: the verifier's
- * parsing rule already forces signature verification via the `verify`
- * predicate, so Tamarin's constraint solver can trace `AcceptEntry` back
- * to either an honest `LeafAttested` or an adversary-known CDI, both of
- * which the built-in DY solver handles without a manual sources hint.
- * The [sources] lemma is therefore omitted in favour of the automatic
- * partial-deconstruction resolution.                                    */
 
 
 /* ===========================================================================
  * 10. Security properties
  * =========================================================================== */
 
-/* ---- (a) Sanity : an honest run reaches Verifier_Accept ---- */
+/* (a) Sanity: an honest run reaches Accept. */
 
 lemma executability:
     exists-trace
@@ -284,7 +280,7 @@ lemma executability:
         & not (Ex X #j. RevealedTEE(X) @ j)
         & not (Ex X #j. CompromisedLeaf(X) @ j) "
 
-/* ---- (b) TEE-TPM session key secrecy ---- */
+/* (b) TEE-TPM session key secrecy */
 
 lemma key_secrecy:
     " All A k #i.
@@ -294,7 +290,7 @@ lemma key_secrecy:
       ==>
           not (Ex #m. K(k) @ m) "
 
-/* ---- (c) Injective agreement, TEE's view of TPM ---- */
+/* (c) Injective agreement, TEE's view of TPM */
 
 lemma injective_agree_TEE:
     " All A ga gb #i.
@@ -305,7 +301,7 @@ lemma injective_agree_TEE:
         & not ( Ex A2 #i2.
                     Commit_TEE(A2, ga, gb) @ i2 & not (#i = #i2) ) "
 
-/* ---- (d) Freshness of accepted aggregate reports ---- */
+/* (d) Freshness of accepted aggregate reports */
 
 lemma freshness:
     " All V A epoch n #i.
@@ -314,7 +310,7 @@ lemma freshness:
       ==>
           Ex #j. SessionStart(V, A, n, epoch) @ j & j < i "
 
-/* ---- (e) Per-leaf report integrity ---- */
+/* (e) Per-leaf report integrity */
 
 lemma report_integrity:
     " All V A epoch L m #i.
@@ -323,17 +319,18 @@ lemma report_integrity:
       ==>
           Ex n #j. LeafAttested(L, A, V, epoch, n, m) @ j & j < i "
 
-/* ---- (f) Cryptographic coverage : EXPECTED TO FALSIFY ---- *
+/* (f) Cryptographic coverage: EXPECTED TO FALSIFY
  *
- *  If a verifier accepts an aggregate for A@epoch and L is a registered
- *  member of A that is *not* compromised, then the verifier must have
- *  parsed a fresh leaf evidence for L in that same session.
+ *  If a verifier accepts an aggregate for A at epoch, L is a registered
+ *  member of A that is *not* compromised, and A's AIK is not revealed,
+ *  then the verifier must have parsed fresh leaf evidence for L in that
+ *  same session, no later than the Accept itself.
  *
  *  In this baseline the aggregator's Quote does not commit to the child
  *  evidence set, so an on-path adversary can drop LEAF_EV(L) between L and
- *  A and the verifier will still Accept.  Tamarin should produce an attack
- *  trace here that is cited as Figure 3 of the paper.
- * --------------------------------------------------------------------- */
+ *  A and the verifier still accepts.  Tamarin finds the silent-omission
+ *  trace; Fig. 3 of the paper shows its k = 2 instance.
+ */
 
 lemma cryptographic_coverage:
     " All V A epoch evset L #i #j.
@@ -343,7 +340,26 @@ lemma cryptographic_coverage:
         & not (Ex #r. CompromisedLeaf(L) @ r & r < i)
         & not (Ex #r. RevealedTPM(A) @ r & r < i)
       ==>
-          Ex m #k. AcceptEntry(V, A, epoch, L, m) @ k & k < i "
+          Ex m #k. AcceptEntry(V, A, epoch, L, m) @ k
+                 & (k < i | #k = #i) "
+
+/* (g) Aggregate binding (added in artefact v1.1)
+ *
+ *  If the Verifier accepts evidence set evset for session (A, epoch, n)
+ *  and A's AIK is not revealed, then A's aggregator actually Quoted
+ *  exactly that evidence set, for that Verifier, epoch and nonce.
+ *  Coverage (f) says "no honest roster leaf is missing"; binding (g) says
+ *  "what the Verifier accepted is what the AIK holder committed to".  The
+ *  ablation theories show that (f) needs D1 and D4, and (g) needs D2 and D3.
+ */
+
+lemma aggregate_binding:
+    " All V A epoch n evset #i.
+          Accept(V, A, epoch, evset) @ i
+        & AcceptedFrom(V, A, epoch, n) @ i
+        & not (Ex #r. RevealedTPM(A) @ r & r < i)
+      ==>
+          Ex #j. AggrQuoted(A, V, epoch, n, evset) @ j & j < i "
 
 end
 /* =========================== END OF FILE =============================== */

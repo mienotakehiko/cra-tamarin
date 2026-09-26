@@ -1,0 +1,366 @@
+/*
+ * ============================================================================
+ *  ablation_D4.spthy
+ *  cra-tamarin companion artefact v1.1: ablation: fixed.spthy without D4
+ *
+ *  Paper    : Formal Analysis of Hierarchical Collective Remote Attestation
+ *             with Heterogeneous TPM/DICE Roots of Trust in Tamarin Prover
+ *             (T. Mieno, BCE'27, Springer LNNS)
+ *
+ *  Reverted edit: D4 (atomic / gated acceptance).  Accept fires after the
+ *  AIK check over the reconstructed p_fix; per-leaf DICE checks and
+ *  AcceptEntry live in separate rules that do not gate Accept.  D1-D3 intact.
+ *  Contrast with fixed_split.spthy, which is also multi-step but emits Accept
+ *  only after both per-leaf checks: gating, not atomicity per se, is what D4
+ *  must provide.
+ *
+ *  Method: this theory is fixed.spthy with ONE edit reverted.  Apart from the
+ *  theory name, every change sits in a line or comment block tagged 'ABLATION'
+ *  (check with: diff fixed.spthy ablation_D4.spthy), and all seven lemma texts are
+ *  identical.  executability stays verified, which rules out a vacuous (dead)
+ *  model.
+ *
+ *  Expected: cryptographic_coverage FALSIFIED (Accept fires with no
+ *  AcceptEntry for an honest roster leaf); aggregate_binding verified;
+ *  the other five lemmas verified.
+ *
+ *  Toolchain: tamarin-prover 1.12.0; cross-checked with maude 3.2 and 3.5.1.
+ *  Expected results: see expected/ablation_D4.txt
+ * ============================================================================
+ */
+
+theory HierarchicalCRA_Ablation_D4
+
+begin
+
+builtins:
+    signing, hashing, diffie-hellman
+
+
+/* ===========================================================================
+ *  1. Public-key infrastructure and Enrollment Authority
+ * =========================================================================== */
+
+rule Register_LeafDICE:
+    [ Fr(~cdi) ]
+  --[ EnrolledLeaf($L, ~cdi), OnlyOnceL($L) ]->
+    [ !LtkLeaf($L, ~cdi), !PkLeaf($L, pk(~cdi)), Out(pk(~cdi)) ]
+
+rule Register_AggrTPM:
+    [ Fr(~aik) ]
+  --[ EnrolledTPM($A, ~aik), OnlyOnceT($A) ]->
+    [ !LtkTPM($A, ~aik), !PkTPM($A, pk(~aik)), Out(pk(~aik)) ]
+
+rule Register_AggrTEE:
+    [ Fr(~tsk) ]
+  --[ EnrolledTEE($A, ~tsk), OnlyOnceE($A) ]->
+    [ !LtkTEE($A, ~tsk), !PkTEE($A, pk(~tsk)), Out(pk(~tsk)) ]
+
+
+/* D1: The Enrollment Authority publishes an explicit two-leaf roster.
+ *     The rule records the two leaves both individually (so that the
+ *     coverage lemma can quantify over each) and as an ordered pair (so
+ *     that the aggregator computes the same hash as the verifier).       */
+rule Publish_Roster:
+    [ !LtkLeaf($L1, cdi1), !LtkLeaf($L2, cdi2), !LtkTPM($A, aik) ]
+  --[ RosterFixed($A, $L1, $L2), RosterDistinct($L1, $L2),
+      MemberOf($L1, $A), MemberOf($L2, $A),
+      OnlyOnceR($A) ]->
+    [ !RosterOf($A, $L1, $L2),
+      !Member($L1, $A), !Member($L2, $A) ]
+
+
+/* ===========================================================================
+ *  2. Verifier -> Aggregator session initiation
+ * =========================================================================== */
+
+rule Verifier_StartSession:
+    [ Fr(~n), Fr(~epoch) ]
+  --[ SessionStart($V, $A, ~n, ~epoch), UniqueEpoch(~epoch) ]->
+    [ Out(<'CHAL', $V, $A, ~n, ~epoch>),
+      !Session($V, $A, ~n, ~epoch) ]
+
+
+/* ===========================================================================
+ *  3. TEE - TPM signed Diffie-Hellman  (unchanged from baseline)
+ * =========================================================================== */
+
+rule TEE_send:
+    [ !LtkTEE($A, tsk), !PkTPM($A, pkTpm), Fr(~ta) ]
+  --[ TEE_Started($A, 'g'^~ta) ]->
+    [ Out(< $A, 'TEE_HELLO', 'g'^~ta,
+            sign(<'TEE', $A, 'g'^~ta>, tsk) >),
+      St_TEE($A, ~ta, pkTpm) ]
+
+rule TPM_respond:
+    let ga = ga_in
+        gb = 'g'^~tb
+    in
+    [ !LtkTPM($A, aik), !PkTEE($A, pkTee),
+      In(< $A, 'TEE_HELLO', ga_in, sig_tee >),
+      Fr(~tb) ]
+  --[ Eq(verify(sig_tee, <'TEE', $A, ga_in>, pkTee), true),
+      AgreeTPM($A, ga, gb),
+      Running_TPM($A, ga, gb) ]->
+    [ Out(< $A, 'TPM_ACK', gb, sign(<'TPM', $A, ga, gb>, aik) >),
+      St_TPM($A, ~tb, ga) ]
+
+rule TEE_finish:
+    let ga = 'g'^~ta
+        k  = gb_in^~ta
+    in
+    [ St_TEE($A, ~ta, pkTpm),
+      In(< $A, 'TPM_ACK', gb_in, sig_tpm >) ]
+  --[ Eq(verify(sig_tpm, <'TPM', $A, ga, gb_in>, pkTpm), true),
+      AgreeTEE($A, ga, gb_in),
+      Commit_TEE($A, ga, gb_in),
+      SessionKey($A, k),
+      SecretKey(k) ]->
+    [ !TEETPMKey($A, k) ]
+
+
+/* ===========================================================================
+ *  4. Leaf attestation (DICE)
+ * =========================================================================== */
+
+rule Leaf_Attest:
+    [ !LtkLeaf($L, cdi), !Member($L, $A),
+      In(<'CHAL', $V, $A, n, epoch>),
+      Fr(~m) ]
+  --[ LeafAttested($L, $A, $V, epoch, n, ~m),
+      LeafMeasurement($L, ~m) ]->
+    /* The leaf publishes BOTH the measurement (m) and the DICE signature
+     * so downstream verifiers can validate it. */
+    [ Out(< 'LEAF_EV', $L, $A, ~m,
+            sign(<'LEAF_EV', $L, $A, $V, epoch, n, ~m>, cdi) >) ]
+
+
+/* ===========================================================================
+ *  5. Aggregator: HARDENED Quote generation
+ *
+ *  D2:  The aggregator now MUST receive the actual leaf evidence (m_i, ev_i)
+ *       of the two roster members and MUST include
+ *           h(<m1, ev1, m2, ev2>)  and  h(<L1, L2>)
+ *       in the TPM Quote payload.
+ *
+ *  The channel between leaves and aggregator is still Dolev-Yao, but the
+ *  hash commitment forces the adversary either to know both signatures
+ *  (which requires both leaves to have actually produced them) or to
+ *  produce a hash collision (excluded by the free-term algebra).
+ * =========================================================================== */
+
+rule Aggregator_Quote_Fixed:
+    let payload = <'AGG_EV', $A, $V, epoch, n,
+                   h(<m1, ev1, m2, ev2>), h(<$L1, $L2>)>
+    in
+    [ !LtkTPM($A, aik),
+      !TEETPMKey($A, k),
+      !RosterOf($A, $L1, $L2),
+      In(<'CHAL', $V, $A, n, epoch>),
+      In(<'LEAF_EV', $L1, $A, m1, ev1>),
+      In(<'LEAF_EV', $L2, $A, m2, ev2>) ]
+  --[ AggrQuoted($A, $V, epoch, n, <m1, m2>),
+      UsedKey($A, k) ]->
+    [ Out(< 'AGG_REPORT', $A, $V, epoch,
+            $L1, $L2, m1, ev1, m2, ev2,
+            sign(payload, aik) >) ]
+
+
+/* ===========================================================================
+ *  6. Verifier decisions (HARDENED)
+ *
+ *  D3:  The Verifier recomputes h(<m1,ev1,m2,ev2>) and h(<L1,L2>) itself
+ *       from the plaintext report and its own !RosterOf, then checks the
+ *       Quote signature over the reconstructed payload.
+ *  D4:  The AIK check, both DICE checks, Accept and both AcceptEntry
+ *       actions occur in ONE rule, so Accept cannot precede an entry.
+ *       ABLATION D4: this theory reverts D4 (see the rule comment below).
+ * =========================================================================== */
+
+/* ABLATION D4: non-atomic acceptance (the "earlier iteration" of Sec. 8).
+ *   Verifier_AcceptAggregate_NA performs D3 and the AIK check and emits
+ *   Accept.  Two separate per-leaf rules over the same report perform the
+ *   DICE checks and emit AcceptEntry, and neither is a precondition of
+ *   Accept.  D1-D3 are unchanged.                                        */
+rule Verifier_AcceptAggregate_NA:
+    let payload = <'AGG_EV', $A, $V, epoch, n,
+                   h(<m1, ev1, m2, ev2>), h(<$L1, $L2>)>
+    in
+    [ !Session($V, $A, n, epoch),
+      !PkTPM($A, pkTpm),
+      !RosterOf($A, $L1, $L2),
+      In(< 'AGG_REPORT', $A, $V, epoch,
+           $L1, $L2, m1, ev1, m2, ev2, sig_agg >) ]
+  --[ Eq(verify(sig_agg, payload, pkTpm), true),
+      Accept($V, $A, epoch, <m1, m2>),
+      AcceptedFrom($V, $A, epoch, n) ]->
+    [ ]
+
+rule Verifier_ParseEntry_L1:
+    let payload = <'AGG_EV', $A, $V, epoch, n,
+                   h(<m1, ev1, m2, ev2>), h(<$L1, $L2>)>
+    in
+    [ !Session($V, $A, n, epoch),
+      !PkTPM($A, pkTpm),
+      !PkLeaf($L1, pkL1),
+      !RosterOf($A, $L1, $L2),
+      In(< 'AGG_REPORT', $A, $V, epoch,
+           $L1, $L2, m1, ev1, m2, ev2, sig_agg >) ]
+  --[ Eq(verify(sig_agg, payload, pkTpm), true),
+      Eq(verify(ev1, <'LEAF_EV', $L1, $A, $V, epoch, n, m1>, pkL1), true),
+      AcceptEntry($V, $A, epoch, $L1, m1) ]->
+    [ ]
+
+rule Verifier_ParseEntry_L2:
+    let payload = <'AGG_EV', $A, $V, epoch, n,
+                   h(<m1, ev1, m2, ev2>), h(<$L1, $L2>)>
+    in
+    [ !Session($V, $A, n, epoch),
+      !PkTPM($A, pkTpm),
+      !PkLeaf($L2, pkL2),
+      !RosterOf($A, $L1, $L2),
+      In(< 'AGG_REPORT', $A, $V, epoch,
+           $L1, $L2, m1, ev1, m2, ev2, sig_agg >) ]
+  --[ Eq(verify(sig_agg, payload, pkTpm), true),
+      Eq(verify(ev2, <'LEAF_EV', $L2, $A, $V, epoch, n, m2>, pkL2), true),
+      AcceptEntry($V, $A, epoch, $L2, m2) ]->
+    [ ]
+
+
+/* ===========================================================================
+ *  7. Adversary compromise capabilities
+ * =========================================================================== */
+
+rule Reveal_LtkTPM:
+    [ !LtkTPM($A, aik) ] --[ RevealedTPM($A) ]-> [ Out(aik) ]
+
+rule Reveal_LtkTEE:
+    [ !LtkTEE($A, tsk) ] --[ RevealedTEE($A) ]-> [ Out(tsk) ]
+
+rule Compromise_LeafSw:
+    [ !LtkLeaf($L, cdi) ] --[ CompromisedLeaf($L) ]-> [ Out(cdi) ]
+
+
+/* ===========================================================================
+ *  8. Restrictions
+ * =========================================================================== */
+
+restriction Equality:
+    " All x y #i. Eq(x, y) @ i ==> x = y "
+
+restriction Unique_LeafEnrollment:
+    " All L #i #j. OnlyOnceL(L) @ i & OnlyOnceL(L) @ j ==> #i = #j "
+
+restriction Unique_TPMEnrollment:
+    " All A #i #j. OnlyOnceT(A) @ i & OnlyOnceT(A) @ j ==> #i = #j "
+
+restriction Unique_TEEEnrollment:
+    " All A #i #j. OnlyOnceE(A) @ i & OnlyOnceE(A) @ j ==> #i = #j "
+
+restriction Roster_Distinct:            /* v1.1: |R(A)| = 2 means two DISTINCT leaves */
+    " All x #i. RosterDistinct(x, x) @ i ==> F "
+
+restriction Unique_Roster:
+    " All A #i #j. OnlyOnceR(A) @ i & OnlyOnceR(A) @ j ==> #i = #j "
+
+restriction Unique_Epoch:
+    " All e #i #j. UniqueEpoch(e) @ i & UniqueEpoch(e) @ j ==> #i = #j "
+
+
+/* ===========================================================================
+ *  9. Security properties
+ * =========================================================================== */
+
+lemma executability:
+    exists-trace
+    " Ex V A epoch evset #i.
+          Accept(V, A, epoch, evset) @ i
+        & not (Ex X #j. RevealedTPM(X) @ j)
+        & not (Ex X #j. RevealedTEE(X) @ j)
+        & not (Ex X #j. CompromisedLeaf(X) @ j) "
+
+lemma key_secrecy:
+    " All A k #i.
+          SessionKey(A, k) @ i
+        & not (Ex #j. RevealedTPM(A) @ j)
+        & not (Ex #j. RevealedTEE(A) @ j)
+      ==>
+          not (Ex #m. K(k) @ m) "
+
+lemma injective_agree_TEE:
+    " All A ga gb #i.
+          Commit_TEE(A, ga, gb) @ i
+        & not (Ex #r. RevealedTPM(A) @ r & r < i)
+      ==>
+          ( Ex #j. Running_TPM(A, ga, gb) @ j & j < i )
+        & not ( Ex A2 #i2.
+                    Commit_TEE(A2, ga, gb) @ i2 & not (#i = #i2) ) "
+
+lemma freshness:
+    " All V A epoch n #i.
+          AcceptedFrom(V, A, epoch, n) @ i
+        & not (Ex #r. RevealedTPM(A) @ r & r < i)
+      ==>
+          Ex #j. SessionStart(V, A, n, epoch) @ j & j < i "
+
+lemma report_integrity:
+    " All V A epoch L m #i.
+          AcceptEntry(V, A, epoch, L, m) @ i
+        & not (Ex #r. CompromisedLeaf(L) @ r & r < i)
+      ==>
+          Ex n #j. LeafAttested(L, A, V, epoch, n, m) @ j & j < i "
+
+
+/* (f) Cryptographic coverage
+ *
+ *  Informal statement:
+ *      If the Verifier accepts an aggregate for A at epoch, L is a
+ *      registered member of A's roster, L is not compromised, and A's AIK
+ *      is not revealed, then the Verifier has recorded an AcceptEntry for
+ *      L in the same session, no later than the Accept itself.
+ *
+ *  ABLATION note: the reasoning below applies to fixed.spthy; the header
+ *  of this file gives the expected result for this theory.
+ *
+ *  Why it holds in the hardened design:
+ *      The Verifier's rule reads the committed roster !RosterOf(A, L1, L2)
+ *      (D1).  Publish_Roster is the only source of MemberOf and fires once
+ *      per aggregator (Unique_Roster), so every member L of A is L1 or L2.
+ *      The same atomic rule verifies a fresh DICE signature from each
+ *      roster leaf and emits AcceptEntry for BOTH L1 and L2 at the instant
+ *      of Accept (D4).  The ablation theories ablation_D{1..4}.spthy
+ *      confirm that coverage needs D1 and D4, whereas D2 and D3 are needed
+ *      only for aggregate_binding (g).
+ */
+
+lemma cryptographic_coverage:
+    " All V A epoch evset L #i #j.
+          Accept(V, A, epoch, evset) @ i
+        & MemberOf(L, A) @ j
+        & j < i
+        & not (Ex #r. CompromisedLeaf(L) @ r & r < i)
+        & not (Ex #r. RevealedTPM(A) @ r & r < i)
+      ==>
+          Ex m #k. AcceptEntry(V, A, epoch, L, m) @ k
+                 & (k < i | #k = #i) "
+
+/* (g) Aggregate binding (added in artefact v1.1)
+ *
+ *  If the Verifier accepts evidence set evset for session (A, epoch, n)
+ *  and A's AIK is not revealed, then A's aggregator actually Quoted
+ *  exactly that evidence set, for that Verifier, epoch and nonce.
+ *  Coverage (f) says "no honest roster leaf is missing"; binding (g) says
+ *  "what the Verifier accepted is what the AIK holder committed to".  The
+ *  ablation theories show that (f) needs D1 and D4, and (g) needs D2 and D3.
+ */
+
+lemma aggregate_binding:
+    " All V A epoch n evset #i.
+          Accept(V, A, epoch, evset) @ i
+        & AcceptedFrom(V, A, epoch, n) @ i
+        & not (Ex #r. RevealedTPM(A) @ r & r < i)
+      ==>
+          Ex #j. AggrQuoted(A, V, epoch, n, evset) @ j & j < i "
+
+end
+/* =========================== END OF FILE =============================== */

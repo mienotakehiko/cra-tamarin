@@ -1,6 +1,6 @@
 """
-Experiment E1 -- Q1: reproduce the silent-omission attack against the
-BASELINE protocol.  Confirms that Verifier.accept() returns a valid
+Experiment E1 (Q1): reproduce the silent-omission attack against the
+BASELINE protocol.  The script confirms that Verifier.accept() returns a valid
 AcceptedReport whose `entries` list has FEWER members than the roster,
 even though the aggregator's TPM Quote signature verifies correctly.
 

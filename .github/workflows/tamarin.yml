@@ -1,0 +1,35 @@
+# Re-proves every Tamarin theory and compares verdicts and step counts with
+# tamarin/expected/.  Runs on push, pull request and on demand.
+name: tamarin
+on:
+  push:
+    paths: ['tamarin/**', '.github/workflows/tamarin.yml']
+  pull_request:
+    paths: ['tamarin/**', '.github/workflows/tamarin.yml']
+  workflow_dispatch:
+jobs:
+  prove:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: tamarin
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install tamarin-prover 1.12.0 + maude 3.5.1
+        run: |
+          PREFIX=$RUNNER_TEMP/toolchain ./ci/install_toolchain.sh
+          echo "$RUNNER_TEMP/toolchain/bin" >> "$GITHUB_PATH"
+      - name: Prove all theories
+        run: TRACES=1 ./run_all.sh
+      - name: Compare with expected results
+        run: ./check.sh
+      - name: Upload logs, proofs and counterexamples
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tamarin-results
+          path: |
+            tamarin/results/
+            tamarin/proofs/
+            tamarin/traces/

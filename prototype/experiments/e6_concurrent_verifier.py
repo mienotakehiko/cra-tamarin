@@ -1,9 +1,9 @@
 """
-E6 -- concurrent Verifier stress test (reply to reviewer H2).
+E6 (Q3): concurrent Verifier stress test.
 
-Ten worker threads each drive their own attestation session against
-one HardenedVerifier instance, all sharing the same Aggregator and
-Leaf public-key tables.  Each worker:
+N_WORKERS threads (default 8) share one HardenedVerifier instance, one
+Aggregator and the same leaf public-key tables, and together run
+N_SESSIONS sessions (default 200).  In each session a worker
 
   1. calls verifier.start_session(A) to obtain its (n, epoch),
   2. gets DICE-signed evidence from L1 and L2,
@@ -11,23 +11,21 @@ Leaf public-key tables.  Each worker:
   4. calls verifier.accept(chal, report) on the shared Verifier
      from its own thread.
 
-The Verifier records every accept and every rejection it emits.  A
-Python-level watchdog thread samples the Verifier's event log at
-1 kHz and asserts:
+Each worker appends every outcome to a shared, lock-protected event
+log.  After all workers finish, the script checks two invariants over
+the log:
 
-  - Whenever an Accept is observed, both AcceptEntry actions for
-    the same session are present in the log at the same sample.
-  - No AcceptEntry ever appears without a matching earlier
-    challenge / earlier signature verification.
+  - every accepted session carries both AcceptEntry records
+    (no partial accept);
+  - no rejected session carries an AcceptEntry record (no ghost entry).
 
-If either invariant fails the script prints the offending sample and exits
-non-zero.  Otherwise the test succeeds and logs the accept-latency
-distribution to results/e6_concurrent.csv.
+The script always writes the per-session latencies to
+results/e6_concurrent.csv, and it exits non-zero if either invariant
+fails.
 
-The test is *not* a replacement for the multi-step Tamarin proof
-(that lives in fixed_split.spthy) but it demonstrates that the
-Python prototype, even under threaded contention, never observes
-the partial states the reviewer worries about.
+The test does not replace the multi-step Tamarin proof in
+fixed_split.spthy, but it shows that the Python prototype never
+exhibits a partial accept, even under threaded contention.
 """
 from __future__ import annotations
 import os, sys, time, threading, statistics, csv

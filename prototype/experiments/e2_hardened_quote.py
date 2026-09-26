@@ -1,10 +1,10 @@
 """
-Experiment E2 -- Q2: the hardened Quote payload is implementable.
+Experiment E2 (Q2): the hardened Quote payload is implementable.
 
-Rewritten to use a SINGLE AIK for both the baseline and the hardened
+The script uses a SINGLE AIK for both the baseline and the hardened
 payloads.  This keeps swtpm mode viable (a swtpm's transient-object
-slot only holds one AK), and it strengthens the like-for-like
-comparison because the same AK is timed on both branches.
+slot holds only one AK) and makes the comparison like-for-like,
+because the same AK is timed on both branches.
 
 The script checks three things:
 

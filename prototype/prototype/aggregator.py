@@ -6,11 +6,11 @@ Composite Attester.  Owns one AIK (TPM) and one TSK (TEE).  Collects
 leaf evidence and produces an aggregate report, in one of two modes:
 
     * BaselineAggregator : follows baseline.spthy
-    * HardenedAggregator : follows fixed.spthy   (D1--D4 applied)
+    * HardenedAggregator : follows fixed.spthy   (aggregator side of D1, D2)
 
-The signed-DH TEE--TPM handshake is intentionally kept minimal here
-because none of the three focus questions (Q1/Q2/Q3) exercises it
-directly -- E4 measures its latency in isolation.
+This module keeps the signed-DH TEE-TPM handshake minimal on purpose:
+the aggregation experiments (E1-E3, E5, E6) do not exercise it, and E4
+measures its latency in isolation.
 """
 from __future__ import annotations
 
@@ -43,7 +43,6 @@ class BaselineAggregator:
     def register(cls, A: str, roster: List[str]) -> "BaselineAggregator":
         return cls(A=A, aik=AikKey.generate(), tee=TeeKey.generate(), roster=list(roster))
 
-    # ------------------------------------------------------------------
     def make_report(
         self,
         V: str,
@@ -82,7 +81,6 @@ class HardenedAggregator:
         assert len(roster) == 2, "fixed.spthy models a two-leaf roster; extend for k>2"
         return cls(A=A, aik=AikKey.generate(), tee=TeeKey.generate(), roster=list(roster))
 
-    # ------------------------------------------------------------------
     def make_report(
         self,
         V: str,
@@ -93,9 +91,9 @@ class HardenedAggregator:
         """Produce a hardened aggregate report.
 
         The aggregator MUST have both roster members' (m, dice_sig).
-        Missing any of them raises KeyError, which is the intended
-        behaviour: a compromised aggregator that drops a leaf CANNOT
-        produce a valid Quote in the hardened design.
+        A missing entry raises KeyError, which is the intended
+        behaviour: an aggregator that lacks a roster member's evidence
+        cannot build a hardened report.
         """
         L1, L2 = self.roster
         m1, ev1 = ev_by_leaf[L1]

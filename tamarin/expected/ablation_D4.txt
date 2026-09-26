@@ -1,0 +1,7 @@
+executability (exists-trace): verified (12 steps)
+key_secrecy (all-traces): verified (9 steps)
+injective_agree_TEE (all-traces): verified (14 steps)
+freshness (all-traces): verified (3 steps)
+report_integrity (all-traces): verified (20 steps)
+cryptographic_coverage (all-traces): falsified (13 steps)
+aggregate_binding (all-traces): verified (8 steps)

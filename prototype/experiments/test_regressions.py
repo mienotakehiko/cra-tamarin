@@ -46,9 +46,7 @@ def setup2():
                 base_V=base_V, hard_V=hard_V)
 
 
-# ---------------------------------------------------------------------
-#  E1 : Q1 -- silent-omission attack succeeds on baseline
-# ---------------------------------------------------------------------
+# E1 (Q1): the silent-omission attack succeeds on the baseline.
 
 
 def test_e1_baseline_silent_omission(setup2):
@@ -66,9 +64,7 @@ def test_e1_baseline_silent_omission(setup2):
         assert "L2" not in leaves_present, "L2 must be missing (attack success)"
 
 
-# ---------------------------------------------------------------------
-#  E2 : Q2 -- hardened Quote fits TPM qualifyingData (<=64 B)
-# ---------------------------------------------------------------------
+# E2 (Q2): the hardened Quote fits TPM qualifyingData (<= 64 B).
 
 
 def test_e2_qualifying_data_size(setup2):
@@ -85,9 +81,7 @@ def test_e2_qualifying_data_size(setup2):
         assert len(q) <= 64, "qualifyingData must fit TPM2B_DATA"
 
 
-# ---------------------------------------------------------------------
-#  E3 : Q3 -- atomicity of hardened accept under adversarial reports
-# ---------------------------------------------------------------------
+# E3 (Q3): the hardened accept stays atomic under adversarial reports.
 
 
 def test_e3_atomic_all_good(setup2):

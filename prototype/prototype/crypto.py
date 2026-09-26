@@ -6,23 +6,24 @@ Thin cryptographic abstraction used by every actor in the prototype.
 
 Two modes are supported:
 
-    * "mock"  : all TPM/DICE/TEE keys are pure-Python
-                RSA-PSS / Ed25519 / X25519 keys.
+    * "mock"  : every key is an in-memory software key (RSA-2048 with
+                PSS/SHA-256 for the AIK, Ed25519 for DICE and the TEE).
                 Works everywhere, including CI, without a TPM daemon.
     * "swtpm" : the AIK (aggregator TPM key) lives inside a running
-                swtpm 0.7+ instance and is used via tpm2-pytss.
-                Leaf DICE keys and TEE keys stay pure-Python (matching
-                the paper's abstraction: only the TPM is a real HSM,
-                DICE/TEE are stand-ins).
+                swtpm 0.7+ instance, driven through tpm2-tools (see
+                prototype/tpm_swtpm.py).  Leaf DICE keys and TEE keys
+                stay in software, matching the paper's abstraction:
+                only the TPM holds a real hardware-style key, and
+                DICE/TEE are stand-ins.
 
-Which mode is active is controlled by the environment variable
+The environment variable
     PROTO_TPM_MODE=mock|swtpm      (default: mock)
+selects the active mode.
 
 The Tamarin model treats the TPM Quote and the DICE signature as the
-generic  sign(payload, sk)  constructor, mirrored here.  Every
-sign/verify function returns the same shape of (payload_bytes,
-signature_bytes) regardless of mode, so the aggregator and verifier
-code is identical between the two modes.
+generic  sign(payload, sk)  constructor, and this module mirrors that
+abstraction.  Both modes expose the same sign/verify interface, so the
+aggregator and verifier code is identical in the two modes.
 """
 from __future__ import annotations
 
@@ -80,9 +81,9 @@ class TeeKey:
     """A TEE signing key (Ed25519, in-memory).
 
     In a real deployment this key lives inside ARM TrustZone or Intel TDX;
-    here it is treated as an in-memory stand-in.  The paper's threat model
-    explicitly abstracts the TEE as an isolated signer, so a software
-    stand-in is faithful to the model.
+    here an in-memory key stands in for it.  Because the paper's threat
+    model abstracts the TEE as an isolated signer, a software stand-in is
+    faithful to the model.
     """
 
     sk: ed25519.Ed25519PrivateKey
@@ -110,7 +111,7 @@ class AikKey:
 
     Both modes expose the same interface:
         aik.sign(payload) -> bytes
-        aik.pk_bytes      -- DER-SPKI of the public key
+        aik.pk_bytes      DER-SPKI of the public key
     The bytes returned by sign() differ in interpretation between the
     two modes (mock: raw RSA-PSS signature; swtpm: length-prefixed
     attest || rsa_sig), so the mode also selects the verifier's parser.

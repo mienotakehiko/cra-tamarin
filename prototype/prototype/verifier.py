@@ -10,9 +10,9 @@ Verifier.  Two flavours matching the two Tamarin theories:
 The key methodological point (paper Section 8, question Q3):
 HardenedVerifier.accept() is a SINGLE Python function that verifies
 the AIK signature AND both DICE signatures before returning an
-AcceptedReport.  Any exception in any of those steps yields None
-without any side-effect.  This is the implementation counterpart of
-the Tamarin atomicity property.
+AcceptedReport.  A failure in any of those checks returns None without
+side effects.  This is the implementation counterpart of the Tamarin
+atomicity property.
 """
 from __future__ import annotations
 
@@ -55,7 +55,6 @@ class BaselineVerifier:
             V=self.V, A=A, nonce=os.urandom(16), epoch=os.urandom(16)
         )
 
-    # --------------------------------------------------------------
     def accept(
         self, chal: Challenge, report: BaselineReport
     ) -> Optional[AcceptedReport]:
@@ -65,8 +64,8 @@ class BaselineVerifier:
         (Verifier_AcceptAggregate + Verifier_ParseEntry).  The
         parse-entry step iterates over whatever evset the aggregator
         forwarded; if the adversary omitted a roster member, no
-        AcceptEntry is produced for that member.  Silent-omission
-        attack succeeds here.
+        AcceptEntry is produced for that member, so the silent-omission
+        attack succeeds.
         """
         # (1) AIK signature over the fixed baseline payload
         payload = baseline_quote_payload(chal.A, chal.V, chal.epoch, chal.nonce)
@@ -87,7 +86,7 @@ class BaselineVerifier:
 
 
 # ============================================================================
-#  Hardened verifier  --  atomic accept  (D3, D4)
+#  Hardened verifier: atomic accept (D3, D4)
 # ============================================================================
 
 
@@ -103,7 +102,6 @@ class HardenedVerifier:
             V=self.V, A=A, nonce=os.urandom(16), epoch=os.urandom(16)
         )
 
-    # --------------------------------------------------------------
     def accept(
         self, chal: Challenge, report: HardenedReport
     ) -> Optional[AcceptedReport]:

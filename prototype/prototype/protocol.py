@@ -67,7 +67,7 @@ def leaf_ev_payload(
 
 
 # ============================================================================
-#  Aggregator report  --  BASELINE version
+#  Aggregator report: BASELINE version
 # ============================================================================
 
 
@@ -105,7 +105,7 @@ class BaselineReport:
 
 
 # ============================================================================
-#  Aggregator report  --  HARDENED version  (matches fixed.spthy)
+#  Aggregator report: HARDENED version (matches fixed.spthy)
 # ============================================================================
 
 
@@ -128,14 +128,11 @@ def hardened_quote_payload(
     )
 
 
-# ------------------------------------------------------------------
-#  TPM 2.0 qualifyingData construction  (paper Section 8, question Q2)
-# ------------------------------------------------------------------
-#  The extended payload is larger than TPM2B_DATA's 64-byte limit,
-#  so it is hashed once more with SHA-256 (32 bytes), and that digest
-#  is passed to TPM2_Quote as qualifyingData.  The verifier receives
-#  the plaintext extended payload alongside the aggregate and re-hashes
-#  to match.
+# TPM 2.0 qualifyingData construction (paper Section 8, question Q2).
+# The extended payload exceeds the 64-byte limit of TPM2B_DATA, so the
+# aggregator hashes it once more with SHA-256 and passes the 32-byte
+# digest to TPM2_Quote as qualifyingData.  The verifier rebuilds the
+# extended payload from the plaintext report and re-hashes it.
 def qualifying_data_for(payload: bytes) -> bytes:
     return h(payload)
 
