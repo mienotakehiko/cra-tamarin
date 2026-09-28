@@ -77,9 +77,8 @@ cra-tamarin/
 │   └── results/
 │       ├── sandbox/             Numbers on the reference sandbox
 │       ├── wsl2/                Independent reproduction (WSL2, i7-13700H)
-│       └── ftpm/                Intel PTT firmware-TPM Quote latency
-└── scripts/
-    └── build_figures.py         Regenerates the plotted figures from CSV
+│_      └── ftpm/                Intel PTT firmware-TPM Quote latency
+
 ```
 
 ## Quick start
@@ -134,12 +133,6 @@ To exercise the real `TPM2_Quote` path on the software TPM:
 export SWTPM_SOCKET=/tmp/mytpm0/swtpm-sock
 PROTO_TPM_MODE=swtpm PYTHONPATH=. python3 experiments/e1_baseline_attack.py
 PROTO_TPM_MODE=swtpm PYTHONPATH=. python3 experiments/e5_scalability.py
-```
-
-### Regenerating the figures
-
-```
-python3 scripts/build_figures.py      # writes figures/*.pdf at the repository root
 ```
 
 ## Data provenance
