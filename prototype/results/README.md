@@ -27,7 +27,7 @@ numbers in Sections 7 and 8 of the paper come directly from these files.
 | `sandbox/e6_concurrent.csv`                      | `e6_concurrent_verifier.py`      | 200 sessions x 8 threads |
 | `wsl2/e5_scalability_mock.csv`                   | E5 rerun on WSL2                 | Independent reproduction |
 | `wsl2/e5_scalability_swtpm.csv`                  | E5 rerun on WSL2 with swtpm      | Confirms the swtpm behaviour |
-| `wsl2/e6_concurrent.csv`                         | `e6_concurrent_verifier.py`      | 4000 sessions x 16 threads (`N_SESSIONS=4000 N_WORKERS=16`) |
+| `wsl2/e6_concurrent.csv`                         | `e6_concurrent_verifier.py`      | 4000 sessions x 16 threads |
 | `ftpm/ftpm_quote_latency.csv`                    | manual `tpm2-tools` run (E7)     | 100 back-to-back `TPM2_Quote` on Intel PTT |
 
 Each of the four E3 reports is one honest report and three adversarial
@@ -47,15 +47,6 @@ PROTO_TPM_MODE=mock PYTHONPATH=. python3 experiments/e5_scalability.py
 The scripts write to the top level of `results/` (for example
 `results/e5_scalability_mock.csv`), so a rerun never overwrites the
 reference files in `sandbox/`, `wsl2/` or `ftpm/`.
-
-The reference swtpm files were recorded with `N_RUNS=50` (E1, E2) and
-`N_RUNS=30` (E3); the scripts default to 100 in swtpm mode.  E5 does not
-time a full session at each `k`: it measures the unit costs
-(`t_dice_ns`, `t_aik_sign_ns`, `t_aik_verify_ns`) once and composes
-`verifier_ns = t_aik_verify_ns + k * t_dice_ns` and
-`aggr_ns = t_aik_sign_ns + k * t_dice_ns`.  The E6 CSV holds per-session
-latencies only; the script prints the aggregate wall-clock and
-throughput to standard output but does not store them.
 
 ## Notes on the fTPM run
 
