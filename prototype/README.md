@@ -10,8 +10,8 @@ measurement (E7) uses `tpm2-tools` directly and has no script here.
 `prototype/crypto.py` selects one of two AIK backends at run time via
 the `PROTO_TPM_MODE` environment variable.
 
-- `PROTO_TPM_MODE=mock` (default): the AIK is a pure-Python
-  RSA-2048/RSA-PSS key. This mode is fast, needs no TPM and runs anywhere,
+- `PROTO_TPM_MODE=mock` (default): the AIK is an in-memory
+  RSA-2048/RSA-PSS software key (`cryptography` library). This mode is fast, needs no TPM and runs anywhere,
   and it serves for correctness testing and for the E3 atomicity stress
   test.
 - `PROTO_TPM_MODE=swtpm`: the AIK lives inside a running `swtpm`
