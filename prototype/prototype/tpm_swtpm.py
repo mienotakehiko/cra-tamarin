@@ -16,12 +16,12 @@ The design has three parts.
 
     2. SwtpmAikKey       is attached to an aggregator and delegates
                          sign(payload) to the context's quote().  The
-                         returned blob carries the TPM2_ATTEST structure
+                         returned blob carries the TPMS_ATTEST structure
                          and the AK's RSA-SSA signature over it, so the
                          verifier can parse and check both.
 
     3. verify_aik_swtpm  is the verifier-side helper.  It parses the
-                         TPM2_ATTEST structure, extracts extraData
+                         TPMS_ATTEST structure, extracts extraData
                          (== qualifyingData), and checks the
                          RSA-SSA/SHA-256 signature against the AK
                          public key.
@@ -249,7 +249,7 @@ class TpmSwtpmContext:
         """Run TPM2_Quote with the given qualifyingData.
 
         Returns (attest_blob, signature, pcr_bundle):
-            attest_blob  : the raw TPM2_ATTEST structure (~145 B)
+            attest_blob  : the raw TPMS_ATTEST structure (~145 B)
             signature    : the AK's RSA-SSA/SHA-256 signature over the
                            SHA-256 hash of the attest_blob (~256 B)
             pcr_bundle   : the concatenated PCR values quoted (~668 B)
@@ -360,7 +360,7 @@ def verify_aik_swtpm(pk_bytes: bytes, payload: bytes, sig_blob: bytes) -> bool:
 
     Steps (each of which is a distinct check):
         1. Parse the (attest || sig) packing.
-        2. Load the TPM2_ATTEST structure and extract extraData.
+        2. Load the TPMS_ATTEST structure and extract extraData.
         3. Check extraData == SHA-256(payload).
         4. Verify the RSA-SSA/SHA-256 signature over SHA-256(attest_blob)
            against pk_bytes.
@@ -378,7 +378,7 @@ def verify_aik_swtpm(pk_bytes: bytes, payload: bytes, sig_blob: bytes) -> bool:
         attest = sig_blob[2:2 + n]
         sig    = sig_blob[2 + n:]
 
-        # Parse TPM2_ATTEST: the extraData field is a TPM2B_DATA
+        # Parse TPMS_ATTEST: the extraData field is a TPM2B_DATA
         # located after the fixed prefix.  Layout (v1.38 §10.12.8):
         #   UINT32  magic          (0xff544347 = "\xffTCG")
         #   UINT16  type
