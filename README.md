@@ -5,33 +5,25 @@ Companion artefact for the paper
 > **Formal Analysis of Hierarchical Collective Remote Attestation with Heterogeneous TPM/DICE Roots of Trust in Tamarin Prover**
 > Takehiko Mieno, EPSON AVASYS Corporation.
 
-This repository contains the Tamarin theories, the reference Python
-prototype, every experiment script, and the raw CSV data of the
-experiments. Every experiment reruns end-to-end on an Ubuntu 24.04 LTS
-host.
+This repository contains the Tamarin theories, the reference Python prototype, every experiment script,
+and the raw CSV data of the experiments.
+Every experiment reruns end-to-end on an Ubuntu 24.04 LTS host.
 
 ## What the paper is about
 
-Collective Remote Attestation (CRA) protocols let a single verifier
-obtain, in one interaction, cryptographic evidence about a whole
-population of devices. When CRA is deployed on real IoT and edge
-gateways, its attesters typically combine heterogeneous roots of trust:
-DICE-based leaves report to gateway aggregators that host both a
-TPM 2.0 and a Trusted Execution Environment (TEE). The paper gives the
-first machine-checked security analysis of a hierarchical CRA that
-binds these roots into a single artefact.
+Collective Remote Attestation (CRA) protocols let a single verifier obtain, in one interaction,
+cryptographic evidence about a whole population of devices.
+When CRA is deployed on real IoT and edge gateways, its attesters typically combine heterogeneous roots of trust:
+DICE-based leaves report to gateway aggregators that host both a TPM 2.0 and a Trusted Execution Environment (TEE).
+The paper gives the first machine-checked security analysis of a hierarchical CRA that binds these roots into a single artefact.
 
-The paper formalises six trace properties in Tamarin. Five hold on a
-baseline conforming to the IETF RATS architecture, but Tamarin falsifies
-*cryptographic coverage* (the guarantee that no aggregate report can
-look complete while omitting an honest leaf) with a 13-step
-counterexample that needs only Dolev-Yao network control. A four-edit
-hardening (D1–D4) restores the property in both an atomic-Accept
-formulation and a multi-step Verifier state machine. Artefact v1.1 adds
-a seventh lemma, *aggregate binding*, and one ablation theory per edit:
-D1 and D4 are necessary for coverage, D2 and D3 for binding. It also
-adds k = 3 instances of the baseline (the attack persists) and of the
-hardened design (all lemmas hold).
+The paper formalises six trace properties in Tamarin. Five hold on a baseline conforming to the IETF RATS architecture,
+but Tamarin falsifies *cryptographic coverage* (the guarantee that no aggregate report can look complete while omitting an honest leaf) with a 13-step
+counterexample that needs only Dolev-Yao network control.
+A four-edit hardening (D1–D4) restores the property in both an atomic-Accept formulation and a multi-step Verifier state machine.
+Artefact v1.1 adds a seventh lemma, *aggregate binding*, and one ablation theory per edit:
+D1 and D4 are necessary for coverage, D2 and D3 for binding.
+It also adds k = 3 instances of the baseline (the attack persists) and of the hardened design (all lemmas hold).
 
 ## Repository layout
 
@@ -77,8 +69,10 @@ cra-tamarin/
 │   └── results/
 │       ├── sandbox/             Numbers on the reference sandbox
 │       ├── wsl2/                Independent reproduction (WSL2, i7-13700H)
-│_      └── ftpm/                Intel PTT firmware-TPM Quote latency
-
+│       └── ftpm/                Intel PTT firmware-TPM Quote latency
+│           └── rerun-20261004/  Independent E7 rerun with full evidence ZIP
+└── scripts/
+    └── summarise_e7_evidence.py Re-checks the E7 rerun evidence ZIP
 ```
 
 ## Quick start
@@ -101,9 +95,8 @@ source ~/.venvs/bce27/bin/activate
 
 ### Reproducing the Tamarin proofs
 
-The proofs need `tamarin-prover 1.12.0` and `maude 3.5.1`; results are
-identical under `maude 3.2`, which Tamarin 1.12.0 reports as
-unsupported. `tamarin/ci/install_toolchain.sh` installs both.
+The proofs need `tamarin-prover 1.12.0` and `maude 3.5.1`; results are identical under `maude 3.2`,
+which Tamarin 1.12.0 reports as unsupported. `tamarin/ci/install_toolchain.sh` installs both.
 
 ```
 cd tamarin
@@ -137,9 +130,11 @@ PROTO_TPM_MODE=swtpm PYTHONPATH=. python3 experiments/e5_scalability.py
 
 ## Data provenance
 
-All CSV files under `prototype/results/` are the direct output of the
-`experiments/*.py` scripts, except the fTPM data, which come from a
-manual `tpm2-tools` run (E7). The three hosts are:
+All CSV files under `prototype/results/` are the direct output of the `experiments/*.py` scripts,
+except the fTPM data, which come from a manual `tpm2-tools` run (E7).
+An independent E7 rerun with full evidence (logs, Quotes, signatures, hashes) is in
+`prototype/results/ftpm/rerun-20261004/`.
+The three hosts are:
 
 | Host label | Environment                                | CPU               | Purpose                               |
 |------------|--------------------------------------------|-------------------|---------------------------------------|
@@ -149,16 +144,13 @@ manual `tpm2-tools` run (E7). The three hosts are:
 
 ## Naming conventions
 
-- `E1` through `E7` in the code and in this repository correspond
-  exactly to the experiment labels in Section 7 of the paper.
+- `E1` through `E7` in the code and in this repository correspond exactly to the experiment labels in Section 7 of the paper.
 - The Tamarin theories map to the paper as follows:
-  `baseline.spthy` to Sections 4, 5 and 7; `fixed.spthy` to Section 8,
-  atomic Verifier; `fixed_split.spthy` to Section 8, multi-step
-  Verifier; `ablation_D{1..4}.spthy` to Section 8, "Necessity of each
-  edit"; `baseline_k3.spthy` and `fixed_k3.spthy` to Section 5,
+  `baseline.spthy` to Sections 4, 5 and 7; `fixed.spthy` to Section 8, atomic Verifier; `fixed_split.spthy` to Section 8,
+  multi-step Verifier; `ablation_D{1..4}.spthy` to Section 8,
+  "Necessity of each edit"; `baseline_k3.spthy` and `fixed_k3.spthy` to Section 5,
   "Bounded roster and hierarchy depth".
-- The four edits **D1**–**D4** of Section 8 appear as rule comments
-  tagged `D1` to `D4` in `fixed.spthy`.
+- The four edits **D1**–**D4** of Section 8 appear as rule comments tagged `D1` to `D4` in `fixed.spthy`.
 
 ## Contact
 

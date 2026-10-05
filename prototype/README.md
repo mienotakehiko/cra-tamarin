@@ -1,28 +1,24 @@
 # Reference prototype
 
-Roughly 900 lines of Python that implement the baseline and hardened
-protocols from the paper, run every experiment of Section 7, and drive
-a software TPM (`swtpm`) through `tpm2-tools`. The hardware fTPM
-measurement (E7) uses `tpm2-tools` directly and has no script here.
+Roughly 900 lines of Python that implement the baseline and hardened protocols from the paper, run every experiment of Section 7,
+and drive a software TPM (`swtpm`) through `tpm2-tools`.
+The hardware fTPM measurement (E7) uses `tpm2-tools` directly and has no script here.
 
 ## Backends
 
-`prototype/crypto.py` selects one of two AIK backends at run time via
-the `PROTO_TPM_MODE` environment variable.
+`prototype/crypto.py` selects one of two AIK backends at run time via the `PROTO_TPM_MODE` environment variable.
 
-- `PROTO_TPM_MODE=mock` (default): the AIK is an in-memory
-  RSA-2048/RSA-PSS software key (`cryptography` library). This mode is fast, needs no TPM and runs anywhere,
-  and it serves for correctness testing and for the E3 atomicity stress
-  test.
-- `PROTO_TPM_MODE=swtpm`: the AIK lives inside a running `swtpm`
-  instance, and every signature goes through `TPM2_Quote` via
-  `tpm2-tools`. Section 7.3 of the paper reports the Q1 and Q2 results
-  for both this backend and the mock backend.
+- `PROTO_TPM_MODE=mock` (default): 
+  the AIK is an in-memory RSA-2048/RSA-PSS software key (`cryptography` library).
+  This mode is fast, needs no TPM and runs anywhere,
+  and it serves for correctness testing and for the E3 atomicity stress test.
+- `PROTO_TPM_MODE=swtpm`:
+  the AIK lives inside a running `swtpm` instance, and every signature goes through `TPM2_Quote` via `tpm2-tools`.
+  Section 7.3 of the paper reports the Q1 and Q2 results for both this backend and the mock backend.
 
-The aggregator's TEE key and the leaves' DICE keys are always Ed25519
-software keys. The paper's threat model treats the TEE as an isolated
-signer and DICE as a hardware root that exposes a signing primitive, so
-a software stand-in for either is faithful to the symbolic model.
+The aggregator's TEE key and the leaves' DICE keys are always Ed25519 software keys.
+The paper's threat model treats the TEE as an isolated signer and DICE as a hardware root that exposes a signing primitive,
+so a software stand-in for either is faithful to the symbolic model.
 
 ## Quick reference
 
@@ -66,9 +62,11 @@ PROTO_TPM_MODE=swtpm PYTHONPATH=. python3 experiments/e5_scalability.py
 | E6  | `e6_concurrent_verifier.py`     | Section 7.3, Q3: concurrent-Verifier stress  | Q3 |
 | E7  | (manual `tpm2-tools` run)       | Section 7.3, Q4: Intel PTT fTPM Quote latency | Q4 |
 
-E7 has no script in this repository. I ran it by hand with
-`tpm2_quote` / `tpm2_checkquote` on a Live-USB Ubuntu boot, and
-`results/ftpm/ftpm_quote_latency.csv` holds its raw data.
+E7 has no script in this repository.
+I ran it by hand with `tpm2_quote` / `tpm2_checkquote` on a Live-USB Ubuntu boot,
+and `results/ftpm/ftpm_quote_latency.csv` holds its raw data.
+An independent rerun with full evidence is in `results/ftpm/rerun-20261004/`; `../scripts/summarise_e7_evidence.py`
+re-checks it.
 
 ## Directory structure
 
@@ -81,13 +79,12 @@ prototype/
 └── results/
     ├── sandbox/        Reference results
     ├── wsl2/           Independent reproduction (Windows 11 + WSL2 + i7-13700H)
-    └── ftpm/           Intel PTT firmware-TPM Quote latency
+    └── ftpm/           Intel PTT firmware-TPM Quote latency (+ rerun-20261004/)
 ```
 
 ## Dependencies
 
-`requirements.lock` pins the exact versions. The main third-party
-packages are:
+`requirements.lock` pins the exact versions. The main third-party packages are:
 
 - `cryptography>=42.0`
 - `pynacl>=1.5`
@@ -95,18 +92,15 @@ packages are:
 - `matplotlib>=3.8`
 - `numpy>=1.26`
 
-The prototype deliberately does not depend on `tpm2-pytss`. The `swtpm`
-backend calls `tpm2-tools` via `subprocess` because the `tpm2-pytss`
-Python API has changed between recent releases, whereas the CLI has
-stayed stable; the header of `prototype/tpm_swtpm.py` gives the details.
+The prototype deliberately does not depend on `tpm2-pytss`.
+The `swtpm` backend calls `tpm2-tools` via `subprocess` because the `tpm2-pytss`
+Python API has changed between recent releases, whereas the CLI has stayed stable;
+the header of `prototype/tpm_swtpm.py` gives the details.
 
 ## Environment notes
 
-- `setup.sh` spawns the `swtpm` daemon with `setsid + nohup`, because
-  the vendor-supplied `--daemon` flag stalls under minimal-init
+- `setup.sh` spawns the `swtpm` daemon with `setsid + nohup`, because the vendor-supplied `--daemon` flag stalls under minimal-init
   container environments (Docker with `tini`, some KVM guests).
-- The aggregator's restricted signing key uses `rsassa-sha256` rather
-  than `rsapss-sha256`, because RSA-PSS on a restricted signing key
-  returns `TPM_RC_SCHEME` (`0x2D2`) on `tpm2-tools 5.6`. The Tamarin
-  proof abstracts signatures as free terms and does not depend on the
-  padding, so the substitution is symbolically neutral.
+- The aggregator's restricted signing key uses `rsassa-sha256` rather than `rsapss-sha256`,
+because RSA-PSS on a restricted signing key returns `TPM_RC_SCHEME` (`0x2D2`) on `tpm2-tools 5.6`.
+The Tamarin proof abstracts signatures as free terms and does not depend on the padding, so the substitution is symbolically neutral.
